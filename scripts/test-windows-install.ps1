@@ -40,7 +40,7 @@ try {
         $ui = Get-Process -Name RustClipSync -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq "$destination/RustClipSync.exe" } | Select-Object -First 1
         if ($ui) { $ui.Refresh(); if ($ui.MainWindowHandle -ne 0 -and $ui.MainWindowTitle -eq 'RustClipSync') { break } }
     }
-    if (!$ui -or $ui.MainWindowHandle -eq 0 -or $ui.MainWindowTitle -ne 'RustClipSync') {
+    if (!$ui -or $ui.MainWindowHandle -eq 0 -or $ui.MainWindowTitle -ne 'RustClipSync' -or (Test-Path "$destination/startup-error.log")) {
         $launcher.Refresh()
         if ($launcher.HasExited) { Write-Output "Launcher exit: $($launcher.ExitCode)" }
         Get-Process -Name RustClipSync -ErrorAction SilentlyContinue | Select-Object Id,MainWindowTitle,MainWindowHandle,Path | Format-List
@@ -54,6 +54,8 @@ try {
         throw 'Double-click did not create a visible WinUI window'
     }
     Start-Sleep -Seconds 2
+    $ui.Refresh()
+    if ($ui.HasExited -or (Test-Path "$destination/startup-error.log")) { throw 'WinUI failed after opening' }
     Write-Output "WinUI window visible: $($ui.MainWindowTitle)"
     # Record the actual native window on the disposable runner for visual QA.
     Add-Type @'
