@@ -9,20 +9,24 @@
 - [x] 加入离线最新值、重试 ID、游标恢复、敏感过滤、竞态和存储失败测试。
 - [x] 本目录记录 WinUI 3 + Rust 方案及 IPC 草案。
 
-以上是本地源码交付状态，不表示已经发布新的 Omaclipsync 二进制或 Windows 应用。共享抽取结果见共享项目的 `VALIDATION.md`；当前 Windows 后台验证见本目录 [VALIDATION.md](VALIDATION.md)。
+共享核心和 Windows 源码已推送 GitHub；Omaclipsync 0.2.1 已经桌面验证并正式发布。Windows 当前提供开发构建，不代表完成正式发布验收。共享抽取结果见共享项目的 `VALIDATION.md`；当前 Windows 后台验证见本目录 [VALIDATION.md](VALIDATION.md)。
 
 ## 第一阶段：Windows 适配与最小打包实验
 
 - [x] 配置 Windows x64 MSVC CI，固定 Rust 1.99.1，接入共享库校验、测试和开发构建。
 - [x] 执行 Windows x64 MSVC CI，原生测试、真实剪贴板测试和 release 构建通过。
-- [ ] 在 Windows 11 普通用户桌面执行交互/恢复验收；在 UI 阶段锁定 .NET 与 Windows App SDK 版本。
+- [x] 锁定 .NET 10、Windows App SDK 2.6.4 和 NuGet 依赖锁文件，采用自带运行组件的发布方式。
+- [ ] 在 Windows 11 普通用户桌面执行交互/恢复验收。
 - [x] 创建 Rust agent，加入单实例/状态文件锁、隐藏消息窗口、托盘及关闭流程（已通过原生 CI，托盘及完整后台交互仍待 Windows 11 日常桌面验收）。
 - [x] 完成剪贴板 adapter：序号、私有来源标记、文本限长、占用重试、启动基线、写入前复查（已在临时 Windows runner 执行专用剪贴板测试）。
 - [x] 实现 DPAPI 密钥、当前用户 ACL、状态原子替换，并加入原生测试。
 - [x] 在 Windows runner 执行 DPAPI/ACL/锁与剪贴板测试。
 - [ ] 完成 Windows 11 日常桌面的异常断电/强杀与恢复验收。
-- [ ] 创建最小 WinUI 窗口与 IPC 握手，验证 UI 退出后 agent 继续工作。
-- [ ] 提前验证 MSIX 安装、两个进程、托盘、登录启动和升级替换，确认打包路线。
+- [x] 创建最小 WinUI 配对/启动/停止窗口，使用匿名标准输入传递首次配对密码，提供托盘打开界面入口。
+- [ ] 完成 Named Pipe 握手与完整状态订阅，验证 UI 退出后 agent 继续工作。
+- [x] 实现按用户的 Inno Setup EXE 安装器，包含运行组件、同款图标、开始菜单及可选桌面/登录启动。
+- [x] 在临时 Windows runner 通过按用户安装、嵌入图标、双击首次窗口与卸载验证，并检查实际截图。
+- [ ] 完成 Windows 11 两个进程、托盘、登录启动和升级替换的交互验收；MSIX 后续再评估。
 
 验收：Windows x64 上与临时服务端完成文本双向同步；未打开 UI 时可以同步；初始剪贴板不上传，下载结果不形成回环。此阶段不向真实用户剪贴板注入测试文本。
 

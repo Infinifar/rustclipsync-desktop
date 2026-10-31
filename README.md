@@ -3,7 +3,7 @@
 面向 Windows 11 的原生剪贴板同步客户端：**WinUI 3 + C#/XAML 界面，Rust 常驻同步进程**。
 界面按需启动，关闭窗口后退出 UI 进程，Rust 进程继续负责托盘、剪贴板监听和同步。
 
-已提供 WinUI 首次配置窗口、Rust 后台和按用户安装的 EXE 安装器。完整历史/设置页面与 Named Pipe 仍在后续计划中。Windows MSVC 原生测试与开发构建已通过 [CI](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41191068330)。本地目录沿用 `rustclipsync-destop`，远程仓库为 [Infinifar/rustclipsync-desktop](https://github.com/Infinifar/rustclipsync-desktop)（当前私有）。
+已提供 WinUI 首次配置窗口、Rust 后台和按用户安装的 EXE 安装器。完整历史/设置页面与 Named Pipe 仍在后续计划中。Windows MSVC 原生测试与开发构建已通过 [CI](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41197072246)。本地目录沿用 `rustclipsync-destop`，远程仓库为 [Infinifar/rustclipsync-desktop](https://github.com/Infinifar/rustclipsync-desktop)（当前私有）。
 
 - [后台使用与构建](agent/README.md)：配对、托盘、配置、状态恢复和当前限制。
 - [验证记录](VALIDATION.md)：已执行检查及 Windows 实机待验收项。
@@ -11,7 +11,7 @@
 - [实施与验收计划](DEVELOPMENT-PLAN.md)：实施顺序、交付物和测试门槛。
 - [本地通信契约草案](IPC.md)：WinUI 与 Rust 的 Named Pipe 消息边界。
 
-共享代码位于相邻项目 [rustclipsync-core](../rustclipsync-core/README.md)。Omaclipsync 已接入本地提取版本；Windows 将使用同一核心，Android 继续用 Kotlin 实现同一协议。
+共享代码由独立项目 [rustclipsync-core](https://github.com/Infinifar/rustclipsync-core) 维护。Omaclipsync 与 Windows 使用同一核心；Android 使用 Kotlin 实现同一协议。
 
 现有生态：
 
@@ -24,7 +24,7 @@
 
 ## Windows 下载与安装
 
-使用 Windows CI 产物 `rustclipsync-windows-x64-setup` 中的 **RustClipSync-0.1.0-setup-x64.exe**，双击按向导安装；不要把单独的 `rustclipsync-agent.exe` 当作安装程序。安装器提供开始菜单入口、可选桌面快捷方式和可选登录启动，默认不要求管理员权限。
+下载 [Windows x64 安装产物](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41197072246/artifacts/13041411062)，解压后运行其中的 **RustClipSync-0.1.0-setup-x64.exe**，双击按向导安装；不要把单独的 `rustclipsync-agent.exe` 当作安装程序。安装器提供开始菜单入口、可选桌面快捷方式和可选登录启动，默认不要求管理员权限。
 
 安装完成后打开 RustClipSync，填写 HTTPS 服务端地址、账户和密码，点击“连接并启动”。已配对时可直接“启动同步”；关闭窗口后 Rust 后台继续运行，双击托盘图标可再次打开界面。密码经继承的匿名标准输入管道交给子进程，不出现在命令行、环境变量或配置文件里。
 

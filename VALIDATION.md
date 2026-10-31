@@ -1,4 +1,4 @@
-# Rust 后台阶段验证
+# Windows 客户端验证
 
 日期：2026-10-31。开发主机为 Linux x86_64；系统 Rust/Cargo 1.99.1。
 
@@ -6,7 +6,7 @@
 
 | 检查 | 结果 |
 | --- | --- |
-| `cargo test --locked` | 8 项通过：agent 的 URL/凭据字段检查与 UTF-16/UTF-8 限长 4 项，共享快照内模块测试 4 项 |
+| `cargo test --locked` | 10 项通过：agent 的 URL/凭据字段、UTF-16/UTF-8 限长和匿名管道密码输入 6 项，共享快照内模块测试 4 项 |
 | `cargo clippy --locked --features check-windows --all-targets -- -D warnings` | 通过；包括全部 Win32 适配代码与原生测试的类型检查 |
 | `cargo fmt --all -- --check` | 通过 |
 | 独立共享核心快照校验 | 所有文件与 UPSTREAM.json 的 SHA-256 一致，未修改消费端快照 |
@@ -42,7 +42,7 @@
 - 测试网络响应丢失、409、410、设备撤销；当前冲突/存储错误通过固定状态提示并停止自动同步。
 - 最后进行资源、延迟与持续运行测量。本轮没有 Windows 性能数值或签名安装包。
 
-当前交付范围是 Rust 后台及 Windows 适配源码。WinUI、Named Pipe、私有敏感收件箱、长期历史、开机启动和 MSIX 打包仍按开发计划推进。
+当前已增加 WinUI 首次配置窗口与按用户的 EXE 安装器，包含开始菜单、可选桌面快捷方式和可选登录启动。完整 Named Pipe、私有敏感收件箱、长期历史、四页设置和 MSIX 仍按开发计划推进。
 
 ## 实现依据
 
@@ -52,3 +52,25 @@
 - [CryptProtectData：当前用户 DPAPI](https://learn.microsoft.com/en-us/windows/win32/api/dpapi/nf-dpapi-cryptprotectdata)
 
 以上 API 文档不构成对本应用运行正确性或断电行为的实机验证。
+
+## 首次安装与图标修复
+
+旧版产物只有 Rust 后台 EXE；无参数时向隐藏的标准输出打印帮助后退出，没有安装向导或设置窗口，也没有嵌入应用图标。这解释了双击无反应和没有图标的现象。
+
+本次加入 WinUI 3 / .NET 10 首次配置窗口和 Inno Setup 按用户安装器，图标直接复用 Omaclipsync 的 SVG 并导出 PNG/ICO。后台无参数启动时转到相邻的 WinUI 程序；缺少界面组件时显示明确提示。安装包包含 .NET、Windows App SDK 2.6.4 和应用本地 C++ 运行组件。
+
+Windows 原生测试已扩展到默认 17 项与专用剪贴板 1 项；新增 GUI 子进程匿名标准输入测试，覆盖真实 Win32 无控制台密码传输、Unicode 和失败时不保存配置。嵌入图标检查比较实际交付 EXE 与原始 ICO 的像素。
+
+早期安装验证实际发现并阻止交付了资源加载失败的构建：WinUI 编译通过，但发布目录缺少应用 XAML 资源。SDK 在启用 WinUI 构建工具后已生成包含应用与控件主题的 `RustClipSync.pri`；构建脚本将该完整索引以未打包运行时需要的 `resources.pri` 名称发布，并检查 MainWindow 与主题 XBF 条目。
+
+[安装复验 41197073934](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41197073934) 已通过按用户安装、实际 EXE 图标像素比较、无参数双击打开原生 WinUI 窗口、截图与卸载。复验使用提交 `6f27033` 构建的安装包、提交 `8d830d2` 的校验脚本。实际截图已下载并目视检查：中文标签、同款图标、原生输入框与按钮均正常，没有启动错误。
+
+测试脚本还修正了 Windows 路径字符串混用斜杠，导致有窗口时仍无法识别进程的问题。
+
+[完整 Windows/Ubuntu CI 41197072246](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41197072246) 已在提交 `8d830d209f0aa24863e59fb62635c82d8e66fc47` 上全部通过：Windows 默认 17 项与真实剪贴板 1 项、格式/Clippy/共享源码校验、Rust release、WinUI 自带运行组件构建、安装/图标/窗口/卸载均成功；Ubuntu 的 10 项测试和 Clippy 同时通过。
+
+最终安装包、SHA256SUMS 与实际首次运行截图见 [Windows x64 安装产物](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41197072246/artifacts/13041411062)。已下载到本地 `dist/installer/`，安装器为 `RustClipSync-0.1.0-setup-x64.exe`。这是未签名的开发安装包。
+
+Windows 11 日常双向同步、完整托盘交互、升级、长时间运行和代码签名仍需单独验收。
+
+资源发布依据：[微软未打包应用资源流程](https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/mrtcore/localize-strings#loading-strings-in-unpackaged-applications)。
