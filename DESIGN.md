@@ -1,3 +1,15 @@
+# Windows 0.2.3 增量设计
+
+- 连接和退出按钮移至敏感收件区之后，新增快捷键页。
+- 全局快捷键由 Rust 后台的隐藏窗口持有，使用 RegisterHotKey / WM_HOTKEY / MOD_NOREPEAT。配置默认空，失败保留原绑定；不安装全局键盘钩子。
+- 组合键更新在窗口所属线程执行，注册成功再提交配置，失败回滚；退出清理。
+- UI 使用 Windows App SDK AppInstance 将重复启动重定向至当前界面进程；快捷键可冷启动仅含目标窗口的界面，也可关闭已有对应窗口。敏感快捷键仅打开遮罩小窗。
+- 历史视图抽取为 HistoryView，供主页面板与独立历史窗口复用。
+
+依据：[RegisterHotKey](https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-registerhotkey)、[AppInstance](https://learn.microsoft.com/windows/apps/develop/launch/multi-instance-apps)。
+
+## 既有设计
+
 # Windows 客户端设计
 
 状态：0.2.2 增加主页空收件区常驻、行内显示/隐藏和同排文本操作；0.2.1 在现有三页基础上增加可选敏感文本自动写入。0.2.0 已实现主页、外观、设置三页，以及本机 Named Pipe、加密历史、私有敏感收件区与登录自启；验证范围见 VALIDATION.md。

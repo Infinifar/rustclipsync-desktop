@@ -5,8 +5,8 @@
 | 条件 | 当前情况 |
 | --- | --- |
 | 自有源码和开源许可 | Windows 客户端及共享核心均为 MIT，已公开；Rust 依赖声明清单见第三方文档 |
-| 维护和构建来源 | GitHub Actions 可追溯构建；Windows 27 项测试、实际 UI 和安装测试通过 |
-| 已发布可执行程序 | 提供明确标注未签名的 0.2.1 版本；永久 Release：https://github.com/Infinifar/rustclipsync-desktop/releases/tag/v0.2.1 |
+| 维护和构建来源 | GitHub Actions 可追溯构建；Windows 28 项测试、实际 UI 和安装测试通过 |
+| 已发布可执行程序 | 提供明确标注未签名的 0.2.3 版本；永久 Release：https://github.com/Infinifar/rustclipsync-desktop/releases/tag/v0.2.3 |
 | 功能和隐私说明 | README、Code signing policy 已准备，包含自动剪贴板传输及服务端可读正文说明 |
 | 维护者 MFA 和审批角色 | 角色已拟定，GitHub API 未返回可验证的 MFA 状态；须维护者确认 GitHub 和 SignPath 双重验证 |
 | 项目信誉 | 新建项目、公开使用记录较少，是否达到可验证信誉要求由基金会决定，没有承诺通过 |
@@ -28,7 +28,7 @@ Maintainer: Infinifar (https://github.com/Infinifar)
 
 Description: A Windows 11 native text clipboard synchronization client with a WinUI 3 interface and a Rust background agent. It connects only to a user-configured HTTPS clipboard service for synchronization. Sensitive synchronization is disabled by default. Received marked sensitive text can be kept in an encrypted inbox or explicitly configured for automatic clipboard application. The project excludes marked sensitive content from ordinary application history and suppresses its own clipboard events. Local state and history are encrypted; synchronization is not end-to-end encrypted.
 
-Build: GitHub Actions Windows workflow, pinned dependencies/actions, Rust core source snapshot with SHA-256 validation. Tested installer source commit: 165f7959d519c7438425e46df168928ad09cd232; workflow run: https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41211210740
+Build: GitHub Actions Windows workflow, pinned dependencies/actions, Rust core source snapshot with SHA-256 validation. Tested installer source commit: 0c3b8954c3d26cc748f26a422e16a48ab374afc0; workflow run: https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41216584020
 
 Distribution: Per-user Inno Setup EXE, with uninstallation. The package carries .NET, Windows App SDK and Microsoft Visual C++ runtime components. We request confirmation of the System Libraries exception and a supported signing process for the installer, uninstaller and temporary setup copies. We will not re-sign third-party DLLs under the project's certificate.
 

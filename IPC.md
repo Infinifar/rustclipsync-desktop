@@ -45,7 +45,7 @@
 | --- | --- |
 | getStatus | 状态、暂停标记、脱敏配置、配置 revision、设备 ID、游标、待办、最近同步、历史错误/变更序号与敏感收件项元数据；无正文和令牌 |
 | setPaused | `{paused: bool}`，设置目标状态并持久化 |
-| updateSettings | `{config: ..., expectedRevision: u64}`，验证并原子保存；拒绝变更配对身份与过期 revision |
+| updateSettings | `{config: ..., expectedRevision: u64, rebindShortcuts?: bool}`，验证并原子保存；拒绝变更配对身份与过期 revision |
 | pushNow / pullNow | 用户明确触发；保持敏感/过滤/游标规则，冲突覆盖在 UI 请求确认 |
 | testFilter | `{filter: ..., text: ...}`，最多 64 KiB 测试文本，不写剪贴板或服务端 |
 | listHistory | `{offset, query, favorites}`，每页 20 条、每条最多 240 字符预览 |
@@ -63,4 +63,12 @@
 
 首次配对仍使用专用 `pair --password-stdin` 子进程。账户密码不进入通用状态通道，不落盘；重新配对必须经 UI 明确确认。主题/字号为独立的非敏感界面偏好；自启设置直接管理经过目标验证的当前用户 `.lnk`，与同步配置分开。
 
-固定错误码包括 `invalid_request`、`invalid_filter`、`busy`、`settings_changed`、`storage_error`、`history_error`、`credentials`、`conflict`、`expired`、`re_pair`、`clipboard_error`、`operation_unconfirmed` 和 `needs_restart`。不透传底层 HTTP/正文错误字符串。
+固定错误码包括 `invalid_request`、`invalid_filter`、`busy`、`settings_changed`、`storage_error`、`history_error`、`shortcut_conflict`、`credentials`、`conflict`、`expired`、`re_pair`、`clipboard_error`、`operation_unconfirmed` 和 `needs_restart`。不透传底层 HTTP/正文错误字符串。
+
+## 快捷键配置
+
+Windows 配置增加 `shortcuts`，默认 `{ "history": null, "inbox": null }`。每项可为 `{ "modifiers": 3, "key": 72 }`，分别使用 Win32 修饰键位和虚拟键码；服务端 HTTP 协议不变。输入限字母、数字、F1–F24（排除 F12），修饰键限 Alt=1、Ctrl=2、Shift=4、Win=8，且至少包含 Ctrl / Alt / Win。拒绝重复组合及未知字段。
+
+`updateSettings` 的可选 `rebindShortcuts: true` 支持相同偏好重新注册，用于解除启动时冲突后的重试。注册由后台窗口所属线程执行；先保留旧绑定注册新组合，成功后再释放旧组合。冲突返回 `shortcut_conflict`，不保存新偏好；保存失败尝试恢复旧绑定。注册请求超时视为存储/控制状态不可确认，停止会话，避免继续声称设置生效。
+
+`getStatus` 返回 `shortcutError` 供界面显示启动注册失败；快捷键故障不等于同步故障。组合键配置不保存剪贴板正文，也不改变设备 ID 或接收游标。

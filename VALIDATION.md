@@ -1,3 +1,21 @@
+# Windows 0.2.3 验证
+
+[CI 41216584020](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41216584020) 在源码提交 `0c3b8954c3d26cc748f26a422e16a48ab374afc0` 上 Windows / Ubuntu 全部通过。
+
+- Linux 17 项测试；Windows 默认 25 项、真实剪贴板 2 项、原生 IPC 1 项，共 28 项。
+- 原生 IPC 验证快捷键更新、真实 RegisterHotKey 冲突、失败保留旧配置与旧绑定、相同偏好重新绑定，以及退出释放组合键。
+- 实际 WinUI 验证连接/退出位于敏感收件区下方；新快捷键页保存组合、拒绝重复和不合法组合，配置经 Rust 原子保存。
+- 使用真实 SendInput 按键验证：主窗口打开时，两个快捷键分别打开/再次关闭目标窗口；重定向复用原界面进程。
+- 主窗口完全退出、只剩一个 Rust 后台时，按键能冷启动历史或敏感小窗，再次触发关闭最后一个窗口并干净退出该界面进程。
+- 清空绑定后实际按键不再打开窗口；打开/关闭快捷键窗口不改变系统剪贴板，敏感窗口仍默认遮罩。
+- 主页面板与独立历史窗口复用 HistoryView；安装资源包包含两个窗口及该控件的编译 XAML。既有主题、自启、收件区显示隐藏、置顶、复制/删除、安装/卸载验证继续通过。
+
+[安装产物](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41216584020/artifacts/13048696509) 已下载到 `dist/windows-0.2.3/` 并核对 SHA256SUMS。安装器 67,840,096 字节，SHA-256 `84831382845582d2bd37568f81ad45b32781edb292606eae60a4cc603dd2e9f1`。快捷键页、历史窗口和主页截图已检查；当前仍未签名。
+
+验证使用临时 GitHub Windows 会话与隔离配置，没有操作用户的 Windows 实机。特殊系统保留快捷键、其他应用抢占、RDP、多登录会话、异常断电及长期资源测量不在这次验收范围；启动注册冲突会显示错误，不影响独立同步。
+
+## 既有版本验证
+
 # Windows 0.2.2 验证
 
 [CI 41213917516](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41213917516) 在提交 `7b71e4d3e8de9f62092b35430e7c4e9221177987` 上 Windows / Ubuntu 全部通过。

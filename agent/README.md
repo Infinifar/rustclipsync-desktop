@@ -39,7 +39,7 @@ cargo clippy --locked --all-targets -- -D warnings
 cargo build --locked --release --bin rustclipsync-agent
 ```
 
-日常使用完整 `RustClipSync-0.2.2-setup-x64.exe` 安装包与 WinUI 设置页面。无参数双击后台时打开同目录的 WinUI；单独复制后台文件会显示用途提示。
+日常使用完整 `RustClipSync-0.2.3-setup-x64.exe` 安装包与 WinUI 设置页面。无参数双击后台时打开同目录的 WinUI；单独复制后台文件会显示用途提示。
 
 开发时可独立运行：
 
@@ -66,6 +66,7 @@ Start-Process -FilePath .\target\release\rustclipsync-agent.exe -ArgumentList 'r
   "paused":false,
   "allowSensitive":false,
   "autoApplySensitive":false,
+  "shortcuts":{"history":null,"inbox":null},
   "intervalSec":60,
   "filter":{"mode":"off","patterns":[],"downloads":false},
   "history":{"enabled":false,"limit":50,"days":7}
@@ -105,3 +106,5 @@ cargo test --locked --test windows_control -- --ignored --test-threads=1
 CI 另外执行实际安装、WinUI 三页、主题/字号持久化、真实自启项、配对后的 C# → Rust 控制与 UI 退出后后台存活检查。结果与待验收范围见 [VALIDATION.md](../VALIDATION.md)。
 
 共享源码快照由 `scripts/sync-core.sh` 从独立项目导出。不要手工编辑 vendor；校验器在独立检出中验证全部导出文件的 SHA-256。
+
+全局快捷键由 Rust 隐藏窗口持有，支持后台独立运行时唤起界面。失败保留旧绑定；退出后台释放。详细字段及错误见 [IPC.md](../IPC.md)。
