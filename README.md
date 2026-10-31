@@ -58,6 +58,10 @@ Windows 11 原生剪贴板同步客户端，使用 **WinUI 3 / C# / XAML 界面�
 
 构建使用 Rust 1.99.1 MSVC、.NET 10、Windows App SDK 2.6.4、Windows SDK 与 Inno Setup 6：先 `cargo build --locked --release --bin rustclipsync-agent`，再执行 `./scripts/build-windows.ps1`。UI 依赖由 NuGet 锁文件固定；共享核心以逐文件 SHA-256 的生成源码快照消费，不手改快照。
 
-当前仓库 [Infinifar/rustclipsync-desktop](https://github.com/Infinifar/rustclipsync-desktop) 为私有；本地目录沿用 `rustclipsync-destop`。服务端和 Android 协议保持兼容，Android 使用 Kotlin 实现同一协议。
+当前仓库 [Infinifar/rustclipsync-desktop](https://github.com/Infinifar/rustclipsync-desktop) 以 MIT 许可证公开开源；本地目录沿用 `rustclipsync-destop`。服务端和 Android 协议保持兼容，Android 使用 Kotlin 实现同一协议。
 
 相关项目：[服务端](https://github.com/Infinifar/rustclipsync-server) · [HTTP 接口协议](https://github.com/Infinifar/rustclipsync-server/blob/main/PROTOCOL-V1.md) · [Android 输入法](https://github.com/Infinifar/fcitx5-android-bibi-keyboard) · [Omaclipsync](https://github.com/Infinifar/omaclipsync)。
+
+## Code signing policy
+
+当前安装包未签名，正在评估 SignPath Foundation，尚未获批。详见 [签名政策](CODE-SIGNING.md)、[申请评估与材料](SIGNPATH-ASSESSMENT.md) 和 [第三方组件](THIRD-PARTY.md)。
