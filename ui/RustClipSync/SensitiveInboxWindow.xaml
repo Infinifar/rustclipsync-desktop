@@ -1,0 +1,24 @@
+<Window x:Class="RustClipSync.SensitiveInboxWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="敏感收件区">
+ <Grid x:Name="Root" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Padding="20" RowSpacing="12">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+   <TextBlock Text="敏感文本" FontWeight="SemiBold" FontSize="18" VerticalAlignment="Center"/>
+   <ToggleButton x:Name="PinButton" Grid.Column="1" Content="置顶" Click="Pin_Click" AutomationProperties.AutomationId="PinSensitiveWindow" ToolTipService.ToolTip="将此小窗保持在其他窗口上方"/>
+  </Grid>
+  <Grid Grid.Row="1" ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+   <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled">
+    <TextBlock x:Name="SecretText" Text="••••••••" TextWrapping="Wrap" IsTextSelectionEnabled="False" AutomationProperties.AutomationId="SensitiveWindowText"/>
+   </ScrollViewer>
+   <Button x:Name="RevealButton" Grid.Column="1" Content="显示" VerticalAlignment="Top" Click="Reveal_Click" IsEnabled="False" AutomationProperties.AutomationId="RevealSensitiveText"/>
+  </Grid>
+  <TextBlock x:Name="ReceivedTime" Grid.Row="2" Text="正在读取收件项…" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" AutomationProperties.AutomationId="SensitiveReceivedTime"/>
+  <InfoBar x:Name="Notice" Grid.Row="3" IsOpen="False" IsClosable="True" Severity="Informational"/>
+  <Grid Grid.Row="4" ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+   <Button x:Name="CopyButton" Content="复制到剪贴板" HorizontalAlignment="Stretch" Click="Copy_Click" IsEnabled="False" AutomationProperties.AutomationId="CopySensitiveText"/>
+   <Button x:Name="DeleteButton" Grid.Column="1" Content="删除" Click="Delete_Click" IsEnabled="False" AutomationProperties.AutomationId="DeleteSensitiveText"/>
+  </Grid>
+ </Grid>
+</Window>

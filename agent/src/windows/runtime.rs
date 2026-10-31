@@ -608,6 +608,10 @@ fn command(
                 .map_err(|_| SyncError::Remote(Error::Status(422)))?;
             Ok(json!({}))
         }
+        Command::ReadInbox { id, offset } => {
+            let item = s.persisted.inbox.as_ref().ok_or_else(invalid)?;
+            crate::inbox::read_chunk(item, &id, offset).map_err(|_| invalid())
+        }
         Command::CopyInbox { id } => {
             let item = s
                 .persisted

@@ -74,6 +74,8 @@ Start-Process -FilePath .\target\release\rustclipsync-agent.exe -ArgumentList 'r
 
 方向为 both/upload/download；过滤为 off/blacklist/whitelist，最多 32 条正则、每条 512 字节。备用检查间隔为 30–300 秒，正常连接使用实时元数据通知。未知字段、非法范围、无效正则或更改配对身份的更新被拒绝。
 
+敏感收件小窗使用 `readInbox` 显式读取正文，每次最多 16 KiB；按当前消息 ID 和 UTF-8 字节边界验证偏移，不改变游标。普通状态、诊断、通知仍无正文。前端只在点击显示后请求，预览最多 64 KiB，复制仍由 Rust 写入完整原文。
+
 `rpc` 开发入口从标准输入读一个请求，通过安全管道返回 JSON。协议错误用固定错误码，不输出底层正文/凭据错误：
 
 ```powershell

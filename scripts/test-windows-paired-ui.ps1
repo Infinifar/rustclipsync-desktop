@@ -56,6 +56,7 @@ do { $stored = Get-Content "$data/config.json" -Raw | ConvertFrom-Json; if ($sto
 if (!$stored.paused) { throw 'WinUI did not pause the actual backend' }
 Invoke-Control OpenSensitiveSettings
 $autoSensitive = Get-Control AutoApplySensitive
+if ($autoSensitive.Current.IsOffscreen) { throw 'Sensitive settings shortcut did not scroll to its target' }
 if ($autoSensitive.Current.IsEnabled -or $autoSensitive.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Current.ToggleState -ne [System.Windows.Automation.ToggleState]::Off) { throw 'Sensitive auto-write was not disabled by default for migrated config' }
 (Get-Control AllowSensitive).GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle()
 if (!(Get-Control AutoApplySensitive).Current.IsEnabled) { throw 'Sensitive auto-write did not follow master toggle' }
@@ -83,6 +84,7 @@ Invoke-Control SaveSyncSettings
 $end = (Get-Date).AddSeconds(15)
 do { $stored = Get-Content "$data/config.json" -Raw | ConvertFrom-Json; if ($stored.history.enabled) { break }; Start-Sleep -Milliseconds 100 } while ((Get-Date) -lt $end)
 if (!$stored.history.enabled -or $stored.history.days -ne 7) { throw 'WinUI settings were not saved by the backend' }
+. "$PSScriptRoot/test-windows-sensitive-ui.ps1"
 # Closing the UI must leave exactly one background process; stop it explicitly.
 $ui.CloseMainWindow() | Out-Null
 if (!$ui.WaitForExit(10000) -or $ui.ExitCode -ne 0) { throw 'Paired UI did not exit cleanly' }

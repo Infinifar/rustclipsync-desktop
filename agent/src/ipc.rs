@@ -52,6 +52,11 @@ pub enum Command {
     CopyInbox {
         id: String,
     },
+    ReadInbox {
+        id: String,
+        #[serde(default)]
+        offset: usize,
+    },
     ClearInbox {
         id: String,
     },
@@ -78,12 +83,16 @@ impl Request {
             | Command::DeleteHistory { id }
             | Command::SetFavorite { id, .. }
             | Command::CopyInbox { id }
+            | Command::ReadInbox { id, .. }
             | Command::ClearInbox { id }
                 if id.len() != 36 =>
             {
                 Err("invalid_request")
             }
             Command::TestFilter { text, .. } if text.len() > 65536 => Err("invalid_request"),
+            Command::ReadInbox { offset, .. } if *offset > rustclipsync_core::MAX_TEXT_BYTES => {
+                Err("invalid_request")
+            }
             _ => Ok(command),
         }
     }

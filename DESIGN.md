@@ -78,6 +78,12 @@ rustclipsync-destop/
 
 来源格式使用注册的私有名称（例如 `RustClipSync.MessageId`），不要解析正文添加隐形字符串。操作系统历史/云剪贴板排除格式与常见密码管理器标记在 Windows 测试中逐项验证；这些是应用提示，并不能识别所有敏感数据。
 
+## 敏感收件小窗
+
+主页使用原生 HyperlinkButton“以小窗显示”；打开独立 WinUI Window 并最小化主窗口。重复打开复用该窗口，置顶由 OverlappedPresenter.IsAlwaysOnTop 控制。窗口默认遮罩，仅在用户点击显示后，通过带 ID 检查、有界且按 UTF-8 边界分块的 readInbox 请求读取正文；预览上限 64 KiB。新收件项、隐藏、删除或关闭均移除可见正文；后台断开时也重新隐藏。复制 / 删除继续由 Rust 按 ID 完成，不依赖可能已过期的界面正文。小窗独立查询元数据，可随系统或应用主题显示。
+
+窗口实现依据 [Microsoft 多窗口指导](https://learn.microsoft.com/windows/apps/develop/ui/multiple-windows) 和 [OverlappedPresenter](https://learn.microsoft.com/windows/windows-app-sdk/api/winrt/microsoft.ui.windowing.overlappedpresenter)。
+
 ## 敏感内容和历史
 
 设置文案统一为：

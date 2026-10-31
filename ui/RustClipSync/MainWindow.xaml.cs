@@ -19,6 +19,7 @@ public sealed partial class MainWindow : Window
     private int historyOffset, historyTotal;
     private List<HistoryRow> history = [];
     private AppearanceSettings appearance = new();
+    private SensitiveInboxWindow? inboxWindow;
     private static string ConfigPath => Path.Combine(AgentClient.DataPath, "config.json");
     public MainWindow()
     {
@@ -266,7 +267,26 @@ public sealed partial class MainWindow : Window
     private void OpenPrivacySettings_Click(object sender, RoutedEventArgs e)
     {
         Navigation.SelectedItem = SettingsNav; PrivacySettingsSection.IsExpanded = true;
-        PrivacySettingsSection.StartBringIntoView();
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => {
+            if (closed || Navigation.SelectedItem != SettingsNav) return;
+            PrivacySettingsSection.UpdateLayout();
+            PrivacySettingsSection.StartBringIntoView(new BringIntoViewOptions { AnimationDesired = false, VerticalAlignmentRatio = 0 });
+        });
+    }
+    private void OpenInboxWindow_Click(object sender, RoutedEventArgs e)
+    {
+        if (inboxId is null) return;
+        try
+        {
+            if (inboxWindow is null)
+            {
+                inboxWindow = new SensitiveInboxWindow(appearance);
+                inboxWindow.Closed += (_, _) => inboxWindow = null;
+            }
+            inboxWindow.Activate();
+            if (AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter) presenter.Minimize();
+        }
+        catch (Exception error) { Error(error); }
     }
     private async void TestFilter_Click(object sender, RoutedEventArgs e)
     {
@@ -279,6 +299,7 @@ public sealed partial class MainWindow : Window
         Root.RequestedTheme = appearance.Theme == "dark" ? ElementTheme.Dark : appearance.Theme == "light" ? ElementTheme.Light : ElementTheme.Default;
         Navigation.FontSize = appearance.FontSize; Root.Resources["ControlContentThemeFontSize"] = (double)appearance.FontSize;
         ApplyCaptionTheme();
+        inboxWindow?.ApplyAppearance(appearance);
     }
     private void ApplyCaptionTheme()
     {

@@ -53,6 +53,7 @@
 | setFavorite | `{id, favorite}`，最多 50 条并受总容量约束 |
 | clearHistory | 清理普通历史与收藏，不修改同步身份、游标或敏感收件项 |
 | copyInbox / clearInbox | `{id}`，验证仍是当前收件项，防止陈旧命令作用到后来的消息 |
+| readInbox | `{id, offset: 0}`，用户明确点击小窗“显示”后读取；按 UTF-8 字节偏移返回最多 16 KiB 正文、id、receivedAt、offset、nextOffset、total；拒绝旧 ID、越界及拆分字符的偏移 |
 | exportDiagnostics | 固定状态、版本、暂停/待办/历史错误，不含账号、正文、令牌或过滤规则 |
 | quit | 完成响应交付后保存/退出后台 |
 

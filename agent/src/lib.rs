@@ -7,4 +7,5 @@ pub mod windows;
 pub mod credentials;
 
 pub mod history;
+pub mod inbox;
 pub mod ipc;

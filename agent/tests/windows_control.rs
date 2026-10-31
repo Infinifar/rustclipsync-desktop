@@ -112,6 +112,24 @@ fn native_pipe_controls_real_agent_preserves_identity_and_never_exposes_secrets(
     let serialized = snapshot.to_string();
     assert!(!serialized.contains(&saved.token));
     assert!(!serialized.contains("private fixture"));
+    let item_id = &saved.inbox.as_ref().unwrap().id;
+    let explicit = rpc("readInbox", json!({"id":item_id,"offset":0}));
+    assert_eq!(
+        explicit["result"]["text"],
+        "private fixture, never in status"
+    );
+    assert_eq!(rpc("getStatus", json!({}))["result"]["cursor"], 42);
+    assert_eq!(
+        rpc(
+            "readInbox",
+            json!({"id":state::random_uuid().unwrap(),"offset":0})
+        )["error"],
+        "invalid_request"
+    );
+    assert_eq!(
+        rpc("readInbox", json!({"id":item_id,"offset":1000}))["error"],
+        "invalid_request"
+    );
     let mut updated = config.clone();
     updated.interval_sec = 90;
     updated.history.enabled = true;

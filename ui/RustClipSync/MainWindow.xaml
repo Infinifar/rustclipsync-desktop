@@ -51,6 +51,7 @@
          <TextBlock x:Name="InboxTime" Style="{StaticResource Note}"/>
          <TextBlock Text="此内容未写入系统剪贴板。关闭历史记录时，仍可使用当前收件项。" Style="{StaticResource Note}"/>
          <StackPanel Orientation="Horizontal" Spacing="10"><Button Content="复制到剪贴板" Click="CopyInbox_Click"/><Button Content="删除" Click="ClearInbox_Click"/></StackPanel>
+         <HyperlinkButton Content="以小窗显示" Click="OpenInboxWindow_Click" AutomationProperties.AutomationId="OpenSensitiveWindow"/>
          <Button Content="自动写入设置" Click="OpenPrivacySettings_Click" AutomationProperties.AutomationId="OpenSensitiveSettings"/>
         </StackPanel>
        </Border>
