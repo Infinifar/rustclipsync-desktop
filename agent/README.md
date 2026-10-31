@@ -27,7 +27,7 @@
 
 历史默认关闭，开启后默认普通记录 50 条 / 7 天，可设置条数与期限；收藏最多 50 条，手动删除前保留。单条历史最多 1 MiB，总正文最多 16 MiB。历史错误不回滚已完成的同步。清空历史不改变游标、设备身份或私有收件项。
 
-敏感同步默认关闭。开启后，敏感接收只进入加密收件区，消费游标与正文同次提交，ack 为 skipped；不会自动调用系统剪贴板写入。用户明确复制时才写入，并附带 Windows 历史/云同步排除标记。并非所有应用都提供敏感标记，这些措施不能识别全部敏感信息。
+敏感同步默认关闭。开启 `allowSensitive` 后，默认将敏感接收存入加密收件区，消费游标与正文同次提交，ack 为 skipped。另可显式启用 `autoApplySensitive`，让之后收到的敏感文本直接写入系统剪贴板，实际写入后确认 applied；两项必须同时为 true，设置热更新无需重新配对。切换选项不补写旧收件项，不改变设备身份或接收游标。自动模式不新增私有收件项，敏感正文始终排除普通历史。手动和自动写入均附带来源及 Windows 历史/云同步排除标记；其他应用仍可读取当前剪贴板。并非所有应用都提供敏感标记，这些措施不能识别全部敏感信息。
 
 ## 构建与运行
 
@@ -39,7 +39,7 @@ cargo clippy --locked --all-targets -- -D warnings
 cargo build --locked --release --bin rustclipsync-agent
 ```
 
-日常使用完整 `RustClipSync-0.2.0-setup-x64.exe` 安装包与 WinUI 设置页面。无参数双击后台时打开同目录的 WinUI；单独复制后台文件会显示用途提示。
+日常使用完整 `RustClipSync-0.2.1-setup-x64.exe` 安装包与 WinUI 设置页面。无参数双击后台时打开同目录的 WinUI；单独复制后台文件会显示用途提示。
 
 开发时可独立运行：
 
@@ -65,6 +65,7 @@ Start-Process -FilePath .\target\release\rustclipsync-agent.exe -ArgumentList 'r
   "direction":"both",
   "paused":false,
   "allowSensitive":false,
+  "autoApplySensitive":false,
   "intervalSec":60,
   "filter":{"mode":"off","patterns":[],"downloads":false},
   "history":{"enabled":false,"limit":50,"days":7}

@@ -52,6 +52,7 @@ pub struct WindowsClipboard {
     expected: Cell<Option<u32>>,
     observed: Cell<Option<u32>>,
     written: RefCell<Option<String>>,
+    auto_apply_sensitive: Cell<bool>,
 }
 impl WindowsClipboard {
     pub fn new(hwnd: usize, formats: Formats) -> Self {
@@ -61,7 +62,11 @@ impl WindowsClipboard {
             expected: Cell::new(None),
             observed: Cell::new(None),
             written: RefCell::new(None),
+            auto_apply_sensitive: Cell::new(false),
         }
+    }
+    pub fn set_auto_apply_sensitive(&self, enabled: bool) {
+        self.auto_apply_sensitive.set(enabled);
     }
     pub fn observe(&self, allow_sensitive: bool) -> Result<Observation, ClipboardError> {
         unsafe {
@@ -140,10 +145,10 @@ impl Clipboard for WindowsClipboard {
         value
     }
     fn write(&self, text: &str, message_id: &str, sensitive: bool) -> Result<(), ClipboardError> {
-        if sensitive {
+        if sensitive && !self.auto_apply_sensitive.get() {
             return Err(ClipboardError::Sensitive);
         }
-        self.write_content(text, message_id, false)
+        self.write_content(text, message_id, sensitive)
     }
 }
 impl WindowsClipboard {

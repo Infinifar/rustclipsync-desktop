@@ -1,4 +1,4 @@
-﻿#define AppVersion "0.2.0"
+﻿#define AppVersion "0.2.1"
 #ifndef BundleDir
  #define BundleDir "..\dist\bundle"
 #endif

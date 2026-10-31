@@ -54,7 +54,28 @@ Invoke-Control PauseSync
 $end = (Get-Date).AddSeconds(15)
 do { $stored = Get-Content "$data/config.json" -Raw | ConvertFrom-Json; if ($stored.paused) { break }; Start-Sleep -Milliseconds 100 } while ((Get-Date) -lt $end)
 if (!$stored.paused) { throw 'WinUI did not pause the actual backend' }
-Invoke-Control NavSettings
+Invoke-Control OpenSensitiveSettings
+$autoSensitive = Get-Control AutoApplySensitive
+if ($autoSensitive.Current.IsEnabled -or $autoSensitive.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Current.ToggleState -ne [System.Windows.Automation.ToggleState]::Off) { throw 'Sensitive auto-write was not disabled by default for migrated config' }
+(Get-Control AllowSensitive).GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle()
+if (!(Get-Control AutoApplySensitive).Current.IsEnabled) { throw 'Sensitive auto-write did not follow master toggle' }
+$autoSensitive.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle()
+Invoke-Control SaveSyncSettings
+$end = (Get-Date).AddSeconds(15)
+do { $stored = Get-Content "$data/config.json" -Raw | ConvertFrom-Json; if ($stored.allowSensitive -and $stored.autoApplySensitive) { break }; Start-Sleep -Milliseconds 100 } while ((Get-Date) -lt $end)
+if (!$stored.allowSensitive -or !$stored.autoApplySensitive) { throw 'WinUI sensitive auto-write setting did not reach Rust config' }
+Save-Screen 'sensitive-auto-write-settings'
+# Preserve the previous inbox without applying it merely because the option changed.
+$request = @{id=[Guid]::NewGuid().ToString();ipcVersion=1;method='getStatus';params=@{}} | ConvertTo-Json -Compress
+$snapshot = $request | & "$destination/rustclipsync-agent.exe" rpc | ConvertFrom-Json
+if ($snapshot.result.cursor -ne 42 -or $snapshot.result.inbox.id -ne $privateId) { throw 'Changing sensitive policy altered an old cursor/inbox' }
+(Get-Control AutoApplySensitive).GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle()
+(Get-Control AllowSensitive).GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle()
+if ((Get-Control AutoApplySensitive).Current.IsEnabled) { throw 'Sensitive auto-write stayed enabled with sensitive sync off' }
+Invoke-Control SaveSyncSettings
+$end = (Get-Date).AddSeconds(15)
+do { $stored = Get-Content "$data/config.json" -Raw | ConvertFrom-Json; if (!$stored.allowSensitive -and !$stored.autoApplySensitive) { break }; Start-Sleep -Milliseconds 100 } while ((Get-Date) -lt $end)
+if ($stored.allowSensitive -or $stored.autoApplySensitive) { throw 'Disabling sensitive auto-write was not persisted' }
 (Get-Control HistorySettingsSection).GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern).Expand()
 Start-Sleep -Milliseconds 300
 (Get-Control HistoryEnabled).GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle()

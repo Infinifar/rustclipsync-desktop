@@ -51,6 +51,7 @@
          <TextBlock x:Name="InboxTime" Style="{StaticResource Note}"/>
          <TextBlock Text="此内容未写入系统剪贴板。关闭历史记录时，仍可使用当前收件项。" Style="{StaticResource Note}"/>
          <StackPanel Orientation="Horizontal" Spacing="10"><Button Content="复制到剪贴板" Click="CopyInbox_Click"/><Button Content="删除" Click="ClearInbox_Click"/></StackPanel>
+         <Button Content="自动写入设置" Click="OpenPrivacySettings_Click" AutomationProperties.AutomationId="OpenSensitiveSettings"/>
         </StackPanel>
        </Border>
        <Expander x:Name="HistoryPanel" Header="剪贴板历史" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Expanding="History_Expanding" AutomationProperties.AutomationId="HistoryPanel">
@@ -98,9 +99,11 @@
          <Button x:Name="ConnectButton" Content="连接并启动" Style="{ThemeResource AccentButtonStyle}" Click="Connect_Click"/>
         </StackPanel>
        </Expander>
-       <Expander Header="同步与隐私" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
-        <StackPanel Spacing="14"><ToggleSwitch x:Name="SensitiveToggle" Header="同步已标记的敏感文本" OnContent="开启" OffContent="关闭"/>
-         <TextBlock Text="默认关闭。部分应用可能不标记敏感内容，因此不能识别所有敏感信息。收到的敏感文本仅存入应用内收件区，不会自动写入系统剪贴板。" Style="{StaticResource Note}"/>
+       <Expander x:Name="PrivacySettingsSection" AutomationProperties.AutomationId="PrivacySettingsSection" Header="同步与隐私" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+        <StackPanel Spacing="14"><ToggleSwitch x:Name="SensitiveToggle" Header="同步已标记的敏感文本" OnContent="开启" OffContent="关闭" Toggled="SensitiveToggle_Toggled" AutomationProperties.AutomationId="AllowSensitive"/>
+         <TextBlock Text="默认关闭。部分应用可能不标记敏感内容，因此不能识别所有敏感信息。" Style="{StaticResource Note}"/>
+         <ToggleSwitch x:Name="AutoSensitiveToggle" Header="自动将收到的敏感文本写入系统剪贴板" OnContent="开启" OffContent="关闭" IsEnabled="False" AutomationProperties.AutomationId="AutoApplySensitive"/>
+         <TextBlock Text="默认关闭，仅存入加密收件区。开启敏感同步后可启用自动写入，并保存同步设置；只影响之后收到的内容，已有收件项不会补写。自动写入不保存到应用普通历史，并请求 Windows 排除剪贴板历史和云同步；其他应用仍能读取当前剪贴板。" Style="{StaticResource Note}"/>
          <NumberBox x:Name="IntervalBox" Header="备用检查间隔（秒）" Minimum="30" Maximum="300" SpinButtonPlacementMode="Compact" Value="60"/>
          <TextBlock Text="正常连接时使用实时通知，此间隔用于备用检查。" Style="{StaticResource Note}"/>
          <ComboBox x:Name="FilterBox" Header="文本过滤" HorizontalAlignment="Stretch" SelectedIndex="0"><ComboBoxItem Content="关闭" Tag="off"/><ComboBoxItem Content="黑名单：匹配时阻止" Tag="blacklist"/><ComboBoxItem Content="白名单：匹配时允许" Tag="whitelist"/></ComboBox>
@@ -120,7 +123,7 @@
        </Expander>
        <StackPanel Orientation="Horizontal" Spacing="10"><Button x:Name="SaveSettingsButton" Content="保存同步设置" Style="{ThemeResource AccentButtonStyle}" Click="SaveSettings_Click" AutomationProperties.AutomationId="SaveSyncSettings"/><Button AutomationProperties.AutomationId="ReloadSettings" Content="重新载入" Click="ReloadSettings_Click"/></StackPanel>
        <Expander Header="关于与诊断" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
-        <StackPanel Spacing="12"><TextBlock Text="RustClipSync 0.2.0" FontWeight="SemiBold"/><TextBlock Text="与 Android 输入法和 Omaclipsync 使用同一同步协议。界面关闭后，后台同步独立运行。" Style="{StaticResource Note}"/>
+        <StackPanel Spacing="12"><TextBlock Text="RustClipSync 0.2.1" FontWeight="SemiBold"/><TextBlock Text="与 Android 输入法和 Omaclipsync 使用同一同步协议。界面关闭后，后台同步独立运行。" Style="{StaticResource Note}"/>
          <StackPanel Orientation="Horizontal" Spacing="8"><HyperlinkButton Content="服务端" NavigateUri="https://github.com/Infinifar/rustclipsync-server"/><HyperlinkButton Content="Android 输入法" NavigateUri="https://github.com/Infinifar/fcitx5-android-bibi-keyboard"/><HyperlinkButton Content="Omaclipsync" NavigateUri="https://github.com/Infinifar/omaclipsync"/></StackPanel>
          <Button Content="导出脱敏诊断" Click="Diagnostics_Click"/><TextBlock x:Name="DiagnosticsResult" IsTextSelectionEnabled="True" Style="{StaticResource Note}"/>
         </StackPanel>

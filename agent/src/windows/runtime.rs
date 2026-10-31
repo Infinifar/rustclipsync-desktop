@@ -223,8 +223,13 @@ fn open_live(
         history,
         generation,
     )?;
-    session.use_sensitive_inbox(true);
+    receive_policy(&mut session, config);
     Ok(session)
+}
+fn receive_policy(session: &mut LiveSession, config: &Config) {
+    let apply = config.applies_sensitive();
+    session.clipboard.set_auto_apply_sensitive(apply);
+    session.use_sensitive_inbox(!apply);
 }
 pub fn run(
     dir: PathBuf,
@@ -512,6 +517,7 @@ fn command(
             updated.paused = config.paused;
             if updated.direction != config.direction
                 || updated.allow_sensitive != config.allow_sensitive
+                || updated.auto_apply_sensitive != config.auto_apply_sensitive
                 || serde_json::to_value(&updated.filter).ok()
                     != serde_json::to_value(&config.filter).ok()
             {
@@ -519,6 +525,7 @@ fn command(
             }
             save_config(dir, &updated)?;
             s.update_policy(updated.filter.compile()?, updated.allow_sensitive);
+            receive_policy(s, &updated);
             s.history.configure(updated.history.clone());
             *config = updated;
             if let Ok(mut v) = control.snapshot.lock() {

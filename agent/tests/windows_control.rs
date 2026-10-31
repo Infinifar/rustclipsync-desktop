@@ -116,6 +116,8 @@ fn native_pipe_controls_real_agent_preserves_identity_and_never_exposes_secrets(
     updated.interval_sec = 90;
     updated.history.enabled = true;
     updated.history.days = 3;
+    updated.allow_sensitive = true;
+    updated.auto_apply_sensitive = true;
     let response = rpc(
         "updateSettings",
         json!({"config":updated,"expectedRevision":1}),
@@ -128,8 +130,22 @@ fn native_pipe_controls_real_agent_preserves_identity_and_never_exposes_secrets(
     assert_eq!(stale["error"], "settings_changed");
     let snapshot = rpc("getStatus", json!({}));
     assert_eq!(snapshot["result"]["config"]["intervalSec"], 90);
+    assert_eq!(snapshot["result"]["config"]["autoApplySensitive"], true);
+    assert_eq!(snapshot["result"]["cursor"], 42);
     assert_eq!(snapshot["result"]["deviceId"], device);
     assert_ne!(snapshot["result"]["state"], "conflict");
+    updated.auto_apply_sensitive = false;
+    assert_eq!(
+        rpc(
+            "updateSettings",
+            json!({"config":updated,"expectedRevision":2})
+        )["ok"],
+        true
+    );
+    assert_eq!(
+        rpc("getStatus", json!({}))["result"]["config"]["autoApplySensitive"],
+        false
+    );
     assert_eq!(
         rpc(
             "testFilter",
@@ -163,4 +179,6 @@ fn native_pipe_controls_real_agent_preserves_identity_and_never_exposes_secrets(
     let config: Config =
         serde_json::from_slice(&std::fs::read(dir.join("config.json")).unwrap()).unwrap();
     assert_eq!(config.history.days, 3);
+    assert!(config.allow_sensitive);
+    assert!(!config.auto_apply_sensitive);
 }

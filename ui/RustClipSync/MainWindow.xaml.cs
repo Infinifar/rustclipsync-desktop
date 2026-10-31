@@ -130,7 +130,8 @@ public sealed partial class MainWindow : Window
         {
             var c = config ?? new AgentSettings();
             ServerBox.Text = c.Server; UserBox.Text = c.User; PasswordBox.Password = "";
-            SensitiveToggle.IsOn = c.AllowSensitive; IntervalBox.Value = c.IntervalSec;
+            SensitiveToggle.IsOn = c.AllowSensitive; AutoSensitiveToggle.IsOn = c.AutoApplySensitive;
+            AutoSensitiveToggle.IsEnabled = c.AllowSensitive; IntervalBox.Value = c.IntervalSec;
             FilterBox.SelectedIndex = c.Filter.Mode == "whitelist" ? 2 : c.Filter.Mode == "blacklist" ? 1 : 0;
             PatternsBox.Text = string.Join("\n", c.Filter.Patterns); FilterDownloads.IsOn = c.Filter.Downloads;
             HistoryToggle.IsOn = c.History.Enabled; HistoryLimitBox.Value = c.History.Limit; HistoryDaysBox.Value = c.History.Days;
@@ -254,10 +255,19 @@ public sealed partial class MainWindow : Window
         if (busy || config is null) return;
         if (!double.IsFinite(IntervalBox.Value) || !double.IsFinite(HistoryLimitBox.Value) || !double.IsFinite(HistoryDaysBox.Value)) { Show("检查数值", "间隔、历史条数与天数必须填写有效整数。", InfoBarSeverity.Warning); return; }
         if (IntervalBox.Value != Math.Truncate(IntervalBox.Value) || HistoryLimitBox.Value != Math.Truncate(HistoryLimitBox.Value) || HistoryDaysBox.Value != Math.Truncate(HistoryDaysBox.Value)) { Show("检查数值", "请填写整数。", InfoBarSeverity.Warning); return; }
-        var updated = config.Copy(); updated.AllowSensitive = SensitiveToggle.IsOn; updated.IntervalSec = (int)IntervalBox.Value; updated.Filter = FilterDraft(); updated.History = new() { Enabled = HistoryToggle.IsOn, Limit = (int)HistoryLimitBox.Value, Days = (int)HistoryDaysBox.Value };
+        var updated = config.Copy(); updated.AllowSensitive = SensitiveToggle.IsOn; updated.AutoApplySensitive = AutoSensitiveToggle.IsOn; updated.IntervalSec = (int)IntervalBox.Value; updated.Filter = FilterDraft(); updated.History = new() { Enabled = HistoryToggle.IsOn, Limit = (int)HistoryLimitBox.Value, Days = (int)HistoryDaysBox.Value };
         if (await Action("updateSettings", new { config = updated, expectedRevision = formRevision })) LoadForm();
     }
     private async void ReloadSettings_Click(object sender, RoutedEventArgs e) { if (busy) return; await Refresh(); LoadForm(); ReadStartup(); }
+    private void SensitiveToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (AutoSensitiveToggle is not null) AutoSensitiveToggle.IsEnabled = SensitiveToggle.IsOn;
+    }
+    private void OpenPrivacySettings_Click(object sender, RoutedEventArgs e)
+    {
+        Navigation.SelectedItem = SettingsNav; PrivacySettingsSection.IsExpanded = true;
+        PrivacySettingsSection.StartBringIntoView();
+    }
     private async void TestFilter_Click(object sender, RoutedEventArgs e)
     {
         if (busy) return;

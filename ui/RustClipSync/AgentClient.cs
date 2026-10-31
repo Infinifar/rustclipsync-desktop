@@ -98,7 +98,8 @@ internal sealed class AgentSettings
 {
     public string Server { get; set; } = ""; public string User { get; set; } = "";
     public string Direction { get; set; } = "both"; public bool Paused { get; set; }
-    public bool AllowSensitive { get; set; } public FilterSettings Filter { get; set; } = new();
+    public bool AllowSensitive { get; set; } public bool AutoApplySensitive { get; set; }
+    public FilterSettings Filter { get; set; } = new();
     public HistorySettings History { get; set; } = new(); public int IntervalSec { get; set; } = 60;
     internal AgentSettings Copy() => JsonSerializer.Deserialize<AgentSettings>(JsonSerializer.Serialize(this, AgentClient.Json), AgentClient.Json)!;
 }

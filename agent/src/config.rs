@@ -86,6 +86,8 @@ pub struct Config {
     #[serde(default)]
     pub allow_sensitive: bool,
     #[serde(default)]
+    pub auto_apply_sensitive: bool,
+    #[serde(default)]
     pub filter: FilterSettings,
     #[serde(default)]
     pub history: HistorySettings,
@@ -100,6 +102,7 @@ impl Config {
             direction: Direction::Both,
             paused: false,
             allow_sensitive: false,
+            auto_apply_sensitive: false,
             filter: FilterSettings::default(),
             history: HistorySettings::default(),
             interval_sec: 60,
@@ -141,6 +144,9 @@ impl Config {
     pub fn downloads(&self) -> bool {
         self.direction != Direction::Upload
     }
+    pub fn applies_sensitive(&self) -> bool {
+        self.allow_sensitive && self.auto_apply_sensitive
+    }
 }
 pub fn invalid(message: &'static str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, message)
@@ -168,8 +174,22 @@ mod tests {
         c.validate().unwrap();
         assert!(c.paused);
         assert!(!c.allow_sensitive);
+        assert!(!c.auto_apply_sensitive);
         assert!(!c.history.enabled);
         assert_eq!(c.history.days, 7);
+    }
+    #[test]
+    fn automatic_sensitive_clipboard_requires_both_opt_ins() {
+        let mut c = Config::new("https://example.test".into(), "user".into());
+        for allow in [false, true] {
+            for auto in [false, true] {
+                c.allow_sensitive = allow;
+                c.auto_apply_sensitive = auto;
+                let restored: Config =
+                    serde_json::from_slice(&serde_json::to_vec(&c).unwrap()).unwrap();
+                assert_eq!(restored.applies_sensitive(), allow && auto);
+            }
+        }
     }
     #[test]
     fn rejects_credentials_unsafe_ranges_and_bad_regex() {
