@@ -107,6 +107,7 @@ public sealed partial class MainWindow : Window
         if (page == "settings" && initialized) { LoadForm(); ReadStartup(); }
         if (page != "settings") PasswordBox.Password = "";
         if (initialized) DispatcherQueue.TryEnqueue(() => {
+            if (closed) return;
             PageScroll.ChangeView(null, 0, null, true);
             if (Notice.Severity is InfoBarSeverity.Success or InfoBarSeverity.Informational) Notice.IsOpen = false;
         });
@@ -271,6 +272,7 @@ public sealed partial class MainWindow : Window
     }
     private void ApplyCaptionTheme()
     {
+        if (closed) return;
         var dark = Root.ActualTheme == ElementTheme.Dark ? 1 : 0;
         DwmSetWindowAttribute(WinRT.Interop.WindowNative.GetWindowHandle(this), 20, ref dark, sizeof(int));
     }

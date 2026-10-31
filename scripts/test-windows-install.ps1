@@ -68,8 +68,14 @@ public static class ScreenSize { [DllImport("user32.dll")] public static extern 
     $bitmap.Save("$root/dist/installer/first-run.png",[Drawing.Imaging.ImageFormat]::Png)
     $graphics.Dispose(); $bitmap.Dispose()
     . "$PSScriptRoot/test-windows-ui.ps1"
+    $null = $ui.Handle # retain a real handle so ExitCode remains available after WM_CLOSE
     $ui.CloseMainWindow() | Out-Null
-    if (!$ui.WaitForExit(10000) -or $ui.ExitCode -ne 0) { throw 'WinUI did not close cleanly' }
+    if (!$ui.WaitForExit(10000)) { throw 'WinUI did not close within the deadline' }
+    Write-Output "WinUI exit code: $($ui.ExitCode)"
+    if ($ui.ExitCode -ne 0) {
+        Get-WinEvent -FilterHashtable @{LogName='Application';StartTime=(Get-Date).AddMinutes(-5)} -ErrorAction SilentlyContinue | Where-Object { $_.ProviderName -in @('.NET Runtime','Application Error') -and $_.Message -match 'RustClipSync|Microsoft.UI.Xaml' } | Select-Object -First 5 TimeCreated,Message | Format-List
+        throw 'WinUI did not close cleanly'
+    }
     . "$PSScriptRoot/test-windows-paired-ui.ps1"
 } finally {
     $env:LOCALAPPDATA = $originalData
