@@ -147,6 +147,9 @@ impl Control {
         platform::bind_shortcuts(&self.signals, settings)
     }
     fn refresh(&self, config: &Config, session: &LiveSession, outcome: Option<&Outcome>) {
+        if matches!(outcome, Some(Outcome::Stored)) {
+            platform::inbox_received(&self.signals);
+        }
         if let Ok(mut s) = self.snapshot.lock() {
             s.config = config.clone();
             s.device = session.persisted.state.device_id.clone();

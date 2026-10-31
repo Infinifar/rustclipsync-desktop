@@ -38,6 +38,7 @@ pub fn notify(signals: &Signals, notification: Notification) {
         PostMessageW(signals.hwnd.load(Ordering::SeqCst) as _, message, 0, 0);
     }
 }
+pub fn inbox_received(_: &Signals) {}
 pub fn bind_shortcuts(signals: &Signals, settings: &Shortcuts) -> Result<(), SyncError> {
     let (tx, rx) = mpsc::sync_channel(1);
     let request = Arc::new(ShortcutRequest {

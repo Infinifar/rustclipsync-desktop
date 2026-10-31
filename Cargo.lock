@@ -1065,6 +1065,7 @@ dependencies = [
 name = "rustclipsync-agent"
 version = "0.2.3"
 dependencies = [
+ "dbus",
  "dbus-secret-service",
  "embed-resource",
  "libc",

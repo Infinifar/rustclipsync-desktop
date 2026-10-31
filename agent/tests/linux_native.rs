@@ -265,3 +265,63 @@ fn secret_service_roundtrip_and_missing_key_never_reset_encrypted_state() {
         .extension()
         .is_some_and(|s| s == "key")));
 }
+
+#[test]
+#[ignore = "Uses an isolated D-Bus notification service; run only in the disposable session"]
+fn desktop_notification_is_delivered_without_content_and_coalesces_bursts() {
+    use dbus::{
+        blocking::Connection,
+        channel::{MatchingReceiver, Sender},
+        message::MatchRule,
+    };
+    use std::sync::atomic::AtomicUsize;
+    disposable();
+    let connection = Connection::new_session().unwrap();
+    connection
+        .request_name("org.freedesktop.Notifications", false, true, false)
+        .unwrap();
+    let received = Arc::new(AtomicUsize::new(0));
+    let count = received.clone();
+    connection.start_receive(
+        MatchRule::new_method_call()
+            .with_interface("org.freedesktop.Notifications")
+            .with_member("Notify"),
+        Box::new(move |message, connection| {
+            let (application, _, icon, summary, body, actions, hints, _): (
+                String,
+                u32,
+                String,
+                String,
+                String,
+                Vec<String>,
+                dbus::arg::PropMap,
+                i32,
+            ) = message.read_all().unwrap();
+            assert_eq!(application, "RustClipSync");
+            assert_eq!(summary, "RustClipSync");
+            assert_eq!(icon, "io.github.infinifar.rustclipsync");
+            assert!(body.contains("敏感收件区"));
+            assert!(actions.is_empty());
+            assert_eq!(hints.len(), 1);
+            assert!(hints.contains_key("desktop-entry"));
+            count.fetch_add(1, Ordering::SeqCst);
+            connection
+                .send(message.method_return().append1(1u32))
+                .unwrap();
+            true
+        }),
+    );
+    let signals = rustclipsync_agent::linux::Signals::default();
+    rustclipsync_agent::linux::inbox_received(&signals);
+    rustclipsync_agent::linux::inbox_received(&signals);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while received.load(Ordering::SeqCst) == 0 {
+        assert!(
+            Instant::now() < deadline,
+            "desktop notification was not delivered"
+        );
+        connection.process(Duration::from_millis(50)).unwrap();
+    }
+    connection.process(Duration::from_millis(200)).unwrap();
+    assert_eq!(received.load(Ordering::SeqCst), 1);
+}
