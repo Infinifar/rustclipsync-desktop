@@ -33,6 +33,7 @@ fn atomic_state_replaces_and_authenticates_without_temp_leaks() {
         server: "https://example.test".into(),
         token: state::random_token().unwrap(),
         paired: true,
+        inbox: None,
         state: state::State::new(
             state::random_uuid().unwrap(),
             state::random_uuid().unwrap(),

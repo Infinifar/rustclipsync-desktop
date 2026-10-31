@@ -4,23 +4,16 @@ use rustclipsync_core::{
     adapters::{Clipboard, ClipboardError},
     state,
 };
-use std::sync::{
-    atomic::{AtomicBool, AtomicU64, AtomicUsize},
-    mpsc, Arc, Mutex,
-};
+use std::sync::{mpsc, Arc};
 #[test]
 #[ignore = "Writes the real Windows clipboard; run only in a disposable Windows session"]
 fn writes_origin_marker_and_rejects_stale_sequence() {
     assert_eq!(std::env::var("RCS_WINDOWS_DISPOSABLE").as_deref(), Ok("1"));
     let (sender, _receiver) = mpsc::sync_channel(8);
-    let control = Arc::new(Control {
-        stop: AtomicBool::new(false),
-        paused: AtomicBool::new(false),
-        generation: Arc::new(AtomicU64::new(0)),
-        hwnd: AtomicUsize::new(0),
-        status: Mutex::new("test"),
-        wake: sender,
-    });
+    let control = Arc::new(Control::new(
+        &rustclipsync_agent::config::Config::new("https://example.test".into(), "fixture".into()),
+        sender,
+    ));
     let window = Window::create(control, false).unwrap();
     let formats = window.formats().unwrap();
     let a = WindowsClipboard::new(window.hwnd(), formats);

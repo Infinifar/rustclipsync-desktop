@@ -140,13 +140,33 @@ impl Clipboard for WindowsClipboard {
         value
     }
     fn write(&self, text: &str, message_id: &str, sensitive: bool) -> Result<(), ClipboardError> {
+        if sensitive {
+            return Err(ClipboardError::Sensitive);
+        }
+        self.write_content(text, message_id, false)
+    }
+}
+impl WindowsClipboard {
+    /// Only an explicit UI action can apply a saved sensitive item.
+    pub fn copy_saved(
+        &self,
+        text: &str,
+        message_id: &str,
+        sensitive: bool,
+    ) -> Result<(), ClipboardError> {
+        self.snapshot(true)?;
+        self.write_content(text, message_id, sensitive)
+    }
+    fn write_content(
+        &self,
+        text: &str,
+        message_id: &str,
+        sensitive: bool,
+    ) -> Result<(), ClipboardError> {
         unsafe {
             if text.len() > MAX_TEXT_BYTES || text.contains('\0') {
                 return Err(ClipboardError::TooLarge);
             }
-            if sensitive {
-                return Err(ClipboardError::Sensitive);
-            } // Private inbox is a later core capability.
             if message_id.len() != 36
                 || !message_id
                     .bytes()
@@ -172,11 +192,17 @@ impl Clipboard for WindowsClipboard {
             // Publish the marker first. Partial writes are never reported applied.
             marker.publish(self.formats.origin)?;
             content.publish(CF_UNICODETEXT)?;
+            if sensitive {
+                Allocation::from_bytes(&1u32.to_le_bytes())?.publish(self.formats.exclude)?;
+                Allocation::from_bytes(&0u32.to_le_bytes())?.publish(self.formats.history)?;
+                Allocation::from_bytes(&0u32.to_le_bytes())?.publish(self.formats.cloud)?;
+            }
             self.written.replace(Some(message_id.to_owned()));
             Ok(())
         }
     }
 }
+
 struct Lease;
 impl Lease {
     unsafe fn open(hwnd: HWND) -> Result<Self, ClipboardError> {

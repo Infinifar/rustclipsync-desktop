@@ -5,3 +5,6 @@ pub mod text;
 pub mod windows;
 
 pub mod credentials;
+
+pub mod history;
+pub mod ipc;

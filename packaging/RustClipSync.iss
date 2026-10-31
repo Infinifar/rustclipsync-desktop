@@ -1,4 +1,4 @@
-﻿#define AppVersion "0.1.0"
+﻿#define AppVersion "0.2.0"
 #ifndef BundleDir
  #define BundleDir "..\dist\bundle"
 #endif
@@ -40,6 +40,8 @@ Source: "{#BundleDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs 
 Name: "{autoprograms}\RustClipSync"; Filename: "{app}\RustClipSync.exe"; WorkingDir: "{app}"
 Name: "{autodesktop}\RustClipSync"; Filename: "{app}\RustClipSync.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 Name: "{userstartup}\RustClipSync"; Filename: "{app}\rustclipsync-agent.exe"; Parameters: "autostart"; WorkingDir: "{app}"; Tasks: autostart
+[UninstallDelete]
+Type: files; Name: "{userstartup}\RustClipSync.lnk"
 [Run]
 Filename: "{app}\RustClipSync.exe"; Description: "Open RustClipSync / 打开 RustClipSync"; Flags: nowait postinstall skipifsilent
 [Code]

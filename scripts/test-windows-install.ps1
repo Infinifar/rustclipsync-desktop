@@ -67,6 +67,7 @@ public static class ScreenSize { [DllImport("user32.dll")] public static extern 
     $graphics.CopyFromScreen(0,0,0,0,$bitmap.Size)
     $bitmap.Save("$root/dist/installer/first-run.png",[Drawing.Imaging.ImageFormat]::Png)
     $graphics.Dispose(); $bitmap.Dispose()
+    . "$PSScriptRoot/test-windows-ui.ps1"
     $ui.CloseMainWindow() | Out-Null
     if (!$ui.WaitForExit(10000)) { throw 'WinUI did not close cleanly' }
 } finally {

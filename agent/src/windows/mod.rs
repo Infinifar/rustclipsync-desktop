@@ -35,3 +35,6 @@ impl Drop for Handle {
         }
     }
 }
+
+pub mod history;
+pub mod pipe;

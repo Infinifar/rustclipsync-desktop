@@ -17,6 +17,10 @@ jobs:
         run: |
           rustup toolchain install 1.99.1 --profile minimal --component clippy,rustfmt
           rustup override set 1.99.1
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: target
+          key: windows-rust-1.99.1-${{ hashFiles('Cargo.lock') }}
       - run: python scripts/verify-core.py
       - run: cargo fmt --all -- --check
       - run: cargo clippy --locked --all-targets -- -D warnings
@@ -26,8 +30,16 @@ jobs:
         env:
           RCS_WINDOWS_DISPOSABLE: "1"
         run: cargo test --locked --test windows_clipboard -- --ignored --test-threads=1
+      - name: Test native named pipe and durable controls
+        env:
+          RCS_WINDOWS_DISPOSABLE: "1"
+        run: cargo test --locked --test windows_control -- --ignored --test-threads=1
       - name: Build native background agent
         run: cargo build --locked --release --bin rustclipsync-agent
+      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: target
+          key: windows-rust-1.99.1-${{ hashFiles('Cargo.lock') }}
       - name: Build self-contained WinUI and per-user installer
         shell: pwsh
         run: ./scripts/build-windows.ps1
@@ -43,6 +55,7 @@ jobs:
             dist/installer/*
             ui/RustClipSync/packages.lock.json
       - name: Upload unsigned development binary
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: rustclipsync-agent-windows-x64-development

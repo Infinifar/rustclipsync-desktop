@@ -144,3 +144,71 @@ fn crypt(bytes: &[u8], decrypt: bool) -> io::Result<Zeroizing<Vec<u8>>> {
         Ok(result)
     }
 }
+
+fn token_sid(logon: bool) -> io::Result<String> {
+    unsafe {
+        let mut raw = ptr::null_mut();
+        if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut raw) == 0 {
+            return Err(io::Error::last_os_error());
+        }
+        let token = Handle::new(raw)?;
+        let class = if logon { TokenLogonSid } else { TokenUser };
+        let mut needed = 0;
+        GetTokenInformation(token.0, class, ptr::null_mut(), 0, &mut needed);
+        if needed == 0 {
+            return Err(io::Error::last_os_error());
+        }
+        let mut buffer = vec![0usize; (needed as usize).div_ceil(mem::size_of::<usize>())];
+        if GetTokenInformation(
+            token.0,
+            class,
+            buffer.as_mut_ptr().cast(),
+            needed,
+            &mut needed,
+        ) == 0
+        {
+            return Err(io::Error::last_os_error());
+        }
+        let sid = if logon {
+            let groups = &*buffer.as_ptr().cast::<TOKEN_GROUPS>();
+            if groups.GroupCount != 1 {
+                return Err(io::Error::other("missing logon identity"));
+            }
+            groups.Groups[0].Sid
+        } else {
+            (*buffer.as_ptr().cast::<TOKEN_USER>()).User.Sid
+        };
+        let mut text = ptr::null_mut();
+        if ConvertSidToStringSidW(sid, &mut text) == 0 {
+            return Err(io::Error::last_os_error());
+        }
+        let mut len = 0;
+        while *text.add(len) != 0 {
+            len += 1;
+        }
+        let result = String::from_utf16_lossy(std::slice::from_raw_parts(text, len));
+        LocalFree(text.cast());
+        Ok(result)
+    }
+}
+pub fn user_sid() -> io::Result<String> {
+    token_sid(false)
+}
+impl Security {
+    pub fn current_logon() -> io::Result<Self> {
+        unsafe {
+            let sid = token_sid(true)?;
+            let mut descriptor = ptr::null_mut();
+            if ConvertStringSecurityDescriptorToSecurityDescriptorW(
+                wide(&format!("D:P(A;;GRGW;;;{sid})")).as_ptr(),
+                SDDL_REVISION_1,
+                &mut descriptor,
+                ptr::null_mut(),
+            ) == 0
+            {
+                return Err(io::Error::last_os_error());
+            }
+            Ok(Self { descriptor })
+        }
+    }
+}

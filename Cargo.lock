@@ -797,9 +797,10 @@ dependencies = [
 
 [[package]]
 name = "rustclipsync-agent"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "embed-resource",
+ "ring",
  "rustclipsync-core",
  "serde",
  "serde_json",
@@ -811,7 +812,7 @@ dependencies = [
 
 [[package]]
 name = "rustclipsync-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64 0.22.1",
  "regex",

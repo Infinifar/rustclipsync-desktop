@@ -39,7 +39,7 @@ fn entry() -> io::Result<()> {
 #[cfg(any(windows, feature = "check-windows"))]
 fn entry() -> io::Result<()> {
     use rustclipsync_agent::{
-        config::{Config, Direction},
+        config::Config,
         windows::{
             clipboard::WindowsClipboard,
             runtime::{self, Control},
@@ -49,10 +49,7 @@ fn entry() -> io::Result<()> {
     };
     use std::{
         path::PathBuf,
-        sync::{
-            atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
-            mpsc, Arc, Mutex,
-        },
+        sync::{atomic::Ordering, mpsc, Arc},
     };
     use zeroize::Zeroizing;
     let args: Vec<_> = std::env::args().skip(1).collect();
@@ -68,7 +65,17 @@ fn entry() -> io::Result<()> {
         return Ok(());
     }
     if args.first().is_some_and(|arg| arg == "--help") {
-        println!("rustclipsync-agent run\nrustclipsync-agent pair <https-url> <account> [--reset] [--password-stdin]\nPassword is read from the console or the GUI's anonymous stdin pipe, never command-line arguments.");
+        println!("rustclipsync-agent run\nrustclipsync-agent rpc < request.json\nrustclipsync-agent pair <https-url> <account> [--reset] [--password-stdin]\nPassword is read from the console or the GUI's anonymous stdin pipe, never command-line arguments.");
+        return Ok(());
+    }
+    if args[0] == "rpc" && args.len() == 1 {
+        use std::io::Read;
+        let mut bytes = Vec::new();
+        io::stdin()
+            .take((rustclipsync_agent::ipc::MAX_FRAME + 1) as u64)
+            .read_to_end(&mut bytes)?;
+        let response = rustclipsync_agent::windows::pipe::call(&bytes)?;
+        println!("{}", serde_json::to_string(&response)?);
         return Ok(());
     }
     let base = PathBuf::from(
@@ -86,14 +93,17 @@ fn entry() -> io::Result<()> {
                     .iter()
                     .all(|a| a == "--reset" || a == "--password-stdin") =>
         {
-            let mut config = Config {
-                server: args[1].clone(),
-                user: args[2].clone(),
-                direction: Direction::Both,
-                paused: false,
-            };
+            let mut config = Config::new(args[1].clone(), args[2].clone());
             config.validate()?;
             let existing = storage::read_private(&dir.join("config.json"), 64 * 1024)?;
+            if let Some(ref bytes) = existing {
+                let mut previous: Config = serde_json::from_slice(bytes)?;
+                previous.validate()?;
+                if previous.identity() == config.identity() {
+                    config = previous;
+                }
+            }
+
             if existing.is_some() && !args[3..].iter().any(|a| a == "--reset") {
                 return Err(io::Error::other(
                     "already configured; --reset explicitly replaces the pairing and pending data",
@@ -127,16 +137,10 @@ fn entry() -> io::Result<()> {
             let mut config: Config = serde_json::from_slice(&bytes)?;
             config.validate()?;
             let (sender, receiver) = mpsc::sync_channel(32);
-            let control = Arc::new(Control {
-                stop: AtomicBool::new(false),
-                paused: AtomicBool::new(config.paused),
-                generation: Arc::new(AtomicU64::new(0)),
-                hwnd: AtomicUsize::new(0),
-                status: Mutex::new("connecting"),
-                wake: sender,
-            });
+            let control = Arc::new(Control::new(&config, sender));
             let window = Window::create(control.clone(), true)?;
             let clipboard = WindowsClipboard::new(window.hwnd(), window.formats()?);
+            let _pipe = rustclipsync_agent::windows::pipe::Server::start(control.clone())?;
             let worker_control = control.clone();
             let worker = std::thread::spawn(move || {
                 runtime::run(dir, config, clipboard, worker_control, receiver)
