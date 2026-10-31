@@ -17,6 +17,7 @@ struct Inner {
     config: HistorySettings,
     data: HistoryData,
     failed: bool,
+    revision: u64,
 }
 impl LocalHistory {
     pub fn open(path: PathBuf, key: [u8; 32], config: HistorySettings) -> Self {
@@ -32,7 +33,11 @@ impl LocalHistory {
             config,
             data,
             failed,
+            revision: 1,
         })))
+    }
+    pub fn revision(&self) -> u64 {
+        self.0.lock().map(|i| i.revision).unwrap_or(0)
     }
     pub fn failed(&self) -> bool {
         self.0.lock().map(|i| i.failed).unwrap_or(true)
@@ -40,6 +45,7 @@ impl LocalHistory {
     pub fn configure(&self, config: HistorySettings) {
         if let Ok(mut i) = self.0.lock() {
             i.config = config;
+            i.revision = i.revision.wrapping_add(1);
         }
     }
     pub fn data(&self) -> io::Result<HistoryData> {
@@ -72,6 +78,7 @@ impl LocalHistory {
         {
             Ok(()) => {
                 i.data = data;
+                i.revision = i.revision.wrapping_add(1);
                 Ok(())
             }
             Err(e) => {
@@ -93,6 +100,7 @@ impl LocalHistory {
         }
         i.data = HistoryData::default();
         i.failed = false;
+        i.revision = i.revision.wrapping_add(1);
         Ok(())
     }
 }

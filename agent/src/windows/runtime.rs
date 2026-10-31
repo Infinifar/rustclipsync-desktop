@@ -39,6 +39,7 @@ struct Snapshot {
     pending: bool,
     last_sync: u64,
     history_error: bool,
+    history_revision: u64,
     inbox: Option<Value>,
 }
 pub struct Control {
@@ -69,6 +70,7 @@ impl Control {
                 pending: false,
                 last_sync: 0,
                 history_error: false,
+                history_revision: 0,
                 inbox: None,
             }),
             commands: Mutex::new(VecDeque::new()),
@@ -92,7 +94,7 @@ impl Control {
     fn status_value(&self) -> Result<Value, &'static str> {
         let s = self.snapshot.lock().map_err(|_| "unavailable")?;
         Ok(
-            json!({"state":*self.status.lock().map_err(|_|"unavailable")?,"paused":self.paused.load(Ordering::SeqCst),"config":s.config,"configRevision":s.revision,"deviceId":s.device,"cursor":s.cursor,"pending":s.pending,"lastSync":s.last_sync,"historyError":s.history_error,"inbox":s.inbox,"version":env!("CARGO_PKG_VERSION")}),
+            json!({"state":*self.status.lock().map_err(|_|"unavailable")?,"paused":self.paused.load(Ordering::SeqCst),"config":s.config,"configRevision":s.revision,"deviceId":s.device,"cursor":s.cursor,"pending":s.pending,"lastSync":s.last_sync,"historyError":s.history_error,"historyRevision":s.history_revision,"inbox":s.inbox,"version":env!("CARGO_PKG_VERSION")}),
         )
     }
     pub fn execute(&self, command: Command) -> Result<Value, &'static str> {
@@ -139,6 +141,7 @@ impl Control {
             s.cursor = session.persisted.state.cursor;
             s.pending = session.has_pending();
             s.history_error = session.history_error || session.history.failed();
+            s.history_revision = session.history.revision();
             s.inbox = session
                 .persisted
                 .inbox

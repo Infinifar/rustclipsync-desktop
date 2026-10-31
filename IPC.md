@@ -43,7 +43,7 @@
 
 | 方法 | 参数 / 行为 |
 | --- | --- |
-| getStatus | 状态、暂停标记、脱敏配置、配置 revision、设备 ID、游标、待办、最近同步、历史错误与敏感收件项元数据；无正文和令牌 |
+| getStatus | 状态、暂停标记、脱敏配置、配置 revision、设备 ID、游标、待办、最近同步、历史错误/变更序号与敏感收件项元数据；无正文和令牌 |
 | setPaused | `{paused: bool}`，设置目标状态并持久化 |
 | updateSettings | `{config: ..., expectedRevision: u64}`，验证并原子保存；拒绝变更配对身份与过期 revision |
 | pushNow / pullNow | 用户明确触发；保持敏感/过滤/游标规则，冲突覆盖在 UI 请求确认 |

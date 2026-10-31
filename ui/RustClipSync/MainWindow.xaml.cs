@@ -15,6 +15,7 @@ public sealed partial class MainWindow : Window
     private string state = "stopped";
     private string? inboxId;
     private long lastSync;
+    private ulong lastHistoryRevision;
     private int historyOffset, historyTotal;
     private List<HistoryRow> history = [];
     private AppearanceSettings appearance = new();
@@ -170,8 +171,9 @@ public sealed partial class MainWindow : Window
             HistoryNote.Text = config.History.Enabled ? $"本地历史已加密，普通记录保留 {config.History.Days} 天；收藏保留至手动删除。" : "历史记录未开启。已有记录仍按期限清理，可在设置中开启或手动清空。";
             if (snapshot.GetProperty("historyError").GetBoolean()) HistoryNote.Text = "历史记录不可用；同步独立运行。请备份数据后检查权限或手动清空历史。";
             if (!formLoaded) LoadForm();
-            if (HistoryPanel.IsExpanded && timestamp != lastSync) await LoadHistory();
-            lastSync = timestamp;
+            var historyRevision = snapshot.TryGetProperty("historyRevision", out var historyVersion) ? historyVersion.GetUInt64() : snapshot.GetProperty("cursor").GetUInt64();
+            if (HistoryPanel.IsExpanded && (timestamp != lastSync || historyRevision != lastHistoryRevision)) await LoadHistory();
+            lastSync = timestamp; lastHistoryRevision = historyRevision;
         }
         catch { if (!closed) StateText.Text = "后台正在启动或处理操作"; }
         finally { if (!closed) SetBusy(busy); }
