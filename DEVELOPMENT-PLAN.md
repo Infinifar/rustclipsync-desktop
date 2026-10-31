@@ -14,11 +14,13 @@
 ## 第一阶段：Windows 适配与最小打包实验
 
 - [x] 配置 Windows x64 MSVC CI，固定 Rust 1.99.1，接入共享库校验、测试和开发构建。
-- [ ] 执行 Windows CI/实机验收；在 UI 阶段锁定 .NET 与 Windows App SDK 版本。
-- [x] 创建 Rust agent，加入单实例/状态文件锁、隐藏消息窗口、托盘及关闭流程（源码与编译检查完成，Windows 运行验收待执行）。
-- [x] 完成剪贴板 adapter：序号、私有来源标记、文本限长、占用重试、启动基线、写入前复查（有专用 Windows 测试，实机执行待完成）。
+- [x] 执行 Windows x64 MSVC CI，原生测试、真实剪贴板测试和 release 构建通过。
+- [ ] 在 Windows 11 普通用户桌面执行交互/恢复验收；在 UI 阶段锁定 .NET 与 Windows App SDK 版本。
+- [x] 创建 Rust agent，加入单实例/状态文件锁、隐藏消息窗口、托盘及关闭流程（已通过原生 CI，托盘及完整后台交互仍待 Windows 11 日常桌面验收）。
+- [x] 完成剪贴板 adapter：序号、私有来源标记、文本限长、占用重试、启动基线、写入前复查（已在临时 Windows runner 执行专用剪贴板测试）。
 - [x] 实现 DPAPI 密钥、当前用户 ACL、状态原子替换，并加入原生测试。
-- [ ] 在 Windows 执行 DPAPI/ACL/锁与剪贴板测试，完成异常断电/进程结束恢复验收。
+- [x] 在 Windows runner 执行 DPAPI/ACL/锁与剪贴板测试。
+- [ ] 完成 Windows 11 日常桌面的异常断电/强杀与恢复验收。
 - [ ] 创建最小 WinUI 窗口与 IPC 握手，验证 UI 退出后 agent 继续工作。
 - [ ] 提前验证 MSIX 安装、两个进程、托盘、登录启动和升级替换，确认打包路线。
 

@@ -14,15 +14,21 @@
 
 `check-windows` 在 Linux 上只用于编译检查，不执行 Windows API，不生成 Windows 可运行文件。共享核心之前完成的真实 HTTPS/状态迁移测试不计入本阶段新增 Windows 实机结果。
 
-## 已准备、尚未执行的 Windows 验收
+## GitHub Windows 原生验证已通过
 
-`.github/workflows/windows.yml` 固定 Rust 1.99.1，在 Windows x64 MSVC 上执行默认测试、Clippy 和 release 构建，生成未签名的开发 artifact。仓库尚未推送并触发该工作流，不能称其已经通过。
+[Windows 客户端 CI 41191068330](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41191068330) 在提交 `f9f35a74dcf2458a55af3f4178a4a8a9a874ce24` 上全部通过，使用 GitHub 临时 Windows Server 2025 x64 / VS 2026 runner 与 Rust 1.99.1 MSVC；Ubuntu 作业同时通过。
 
-Windows 默认额外执行 6 项原生测试：DPAPI 加解密及篡改、加密状态原子替换、已有锁文件的互斥、密钥缺失不重建、目录/文件保护 DACL、私有文件大小限制。
+- Windows 默认测试 14 项通过：agent 逻辑 4 项、DPAPI/存储/权限/锁 6 项、内嵌共享模块 4 项。
+- 真实剪贴板测试在 `RCS_WINDOWS_DISPOSABLE=1` 的临时 runner 显式执行，1 项通过：来源标记、自身写入和重复通知过滤，以及拒绝过期序号覆盖。
+- 格式检查、Clippy、共享源码哈希检查、MSVC release 构建均通过。
+- 构建产物 `rustclipsync-agent-windows-x64-development` 已上传为 [artifact 13038334662](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41191068330/artifacts/13038334662)，是未签名的开发构建。
+- 二进制已下载到本地 `dist/windows-x64/rustclipsync-agent.exe`，同目录保存 SHA256SUMS。
 
-另有 1 项默认忽略的剪贴板测试，验证来源标记、重复序号通知及写入前的序号冲突拒绝。只允许在设置 `RCS_WINDOWS_DISPOSABLE=1` 的临时 Windows 会话中执行，会覆盖该会话剪贴板。
+本轮原生验证修复了两处平台差异：源码快照校验统一使用 POSIX 相对路径，Git 强制文本 LF；自身写入确认改为在剪贴板锁内核对 owner HWND 和唯一消息标记，再记下最终观察到的序号，避免关闭剪贴板时序号变化导致误判。
 
-本机曾用隔离目录中的官方 Rust MSVC 目标库、编译器及 Windows SDK UCRT 头尝试交叉检查；原生 C 依赖 `ring` 仍需要完整 Visual C++ CRT 头文件（缺少 `vcruntime.h`）。这不计作 Windows 目标构建通过，也没有通过替换加密实现或伪造头文件绕过。系统工具链未修改。
+共享核心本身另通过 [Windows / Ubuntu 的 20 项完整测试及 Clippy](https://github.com/Infinifar/rustclipsync-core/actions/runs/41190778425)，不是只运行消费端快照内的 4 项模块测试。
+
+早期本机交叉检查曾因缺少完整 Visual C++ CRT 头而受限；本次已由 GitHub 的真实 Windows MSVC 环境完成原生编译、测试和 release 产物生成。Windows Server runner 的测试不等于下面所有 Windows 11 日常桌面场景都已验收。
 
 ## 实机检查清单
 

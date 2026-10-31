@@ -3,7 +3,7 @@
 面向 Windows 11 的原生剪贴板同步客户端：**WinUI 3 + C#/XAML 界面，Rust 常驻同步进程**。
 界面按需启动，关闭窗口后退出 UI 进程，Rust 进程继续负责托盘、剪贴板监听和同步。
 
-当前已实现第一阶段的 Rust 后台与 Windows 平台适配，提供开发用 agent；WinUI 页面与 MSIX 安装包后续接入。本地目录沿用 `rustclipsync-destop`，远程仓库为 [Infinifar/rustclipsync-desktop](https://github.com/Infinifar/rustclipsync-desktop)（当前私有）。
+当前已实现第一阶段的 Rust 后台与 Windows 平台适配，提供开发用 agent；WinUI 页面与 MSIX 安装包后续接入。Windows MSVC 原生测试与开发构建已通过 [CI](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41191068330)。本地目录沿用 `rustclipsync-destop`，远程仓库为 [Infinifar/rustclipsync-desktop](https://github.com/Infinifar/rustclipsync-desktop)（当前私有）。
 
 - [后台使用与构建](agent/README.md)：配对、托盘、配置、状态恢复和当前限制。
 - [验证记录](VALIDATION.md)：已执行检查及 Windows 实机待验收项。
