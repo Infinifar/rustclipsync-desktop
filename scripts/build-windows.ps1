@@ -5,6 +5,21 @@ $installer = Join-Path $root 'dist/installer'
 New-Item -ItemType Directory -Force $bundle,$installer | Out-Null
 & dotnet publish "$root/ui/RustClipSync/RustClipSync.csproj" -c Release -r win-x64 -p:Platform=x64 --self-contained true -o $bundle
 if ($LASTEXITCODE -ne 0) { throw 'WinUI publish failed' }
+# XAML .xbf files and the application PRI must be in the published app too.
+# Listing the output makes a missing resource a packaging error, not a silent
+# crash on the user's computer.
+$pri = Get-ChildItem "$root/ui/RustClipSync/bin" -Recurse -Filter 'resources.pri' | Select-Object -First 1
+if ($pri -and !(Test-Path "$bundle/resources.pri")) { Copy-Item $pri.FullName "$bundle/resources.pri" }
+Get-ChildItem "$root/ui/RustClipSync/bin" -Recurse -Filter '*.xbf' | ForEach-Object {
+    $relative = [IO.Path]::GetRelativePath($pri.DirectoryName,$_.FullName)
+    if (!$relative.StartsWith('..')) {
+        $target = Join-Path $bundle $relative
+        New-Item -ItemType Directory -Force (Split-Path $target) | Out-Null
+        Copy-Item $_.FullName $target -Force
+    }
+}
+if (!(Test-Path "$bundle/resources.pri")) { throw 'Application resources.pri is missing from the WinUI publish output' }
+if (!(Test-Path "$bundle/Assets/rustclipsync.ico")) { throw 'Application icon asset is missing' }
 Copy-Item "$root/target/release/rustclipsync-agent.exe" $bundle -Force
 Copy-Item "$root/LICENSE" "$bundle/LICENSE.txt" -Force
 # Bundle the redistributable app-local C/C++ runtime for machines without a
