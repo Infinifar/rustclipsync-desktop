@@ -10,6 +10,10 @@ on:
         description: Rebuild UI and packaging, reusing the already compiled Rust agent
         type: boolean
         default: false
+      source_artifact:
+        description: Artifact containing the installer
+        default: rustclipsync-windows-x64-setup
+        required: true
 permissions:
   contents: read
   actions: read
@@ -26,8 +30,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_RUN: ${{ inputs.source_run }}
+          SOURCE_ARTIFACT: ${{ inputs.source_artifact }}
         run: |
-          gh run download $env:SOURCE_RUN --repo $env:GITHUB_REPOSITORY --name rustclipsync-windows-x64-setup --dir downloaded
+          gh run download $env:SOURCE_RUN --repo $env:GITHUB_REPOSITORY --name $env:SOURCE_ARTIFACT --dir downloaded
           if ($LASTEXITCODE -ne 0) { throw 'Download failed' }
           New-Item -ItemType Directory -Force dist/installer | Out-Null
           $setup = Get-ChildItem downloaded -Recurse -Filter 'RustClipSync-*-setup-x64.exe' | Select-Object -First 1
