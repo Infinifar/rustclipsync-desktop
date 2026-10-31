@@ -1,0 +1,10 @@
+[workspace]
+members = ["agent"]
+resolver = "2"
+
+[profile.release]
+opt-level = "s"
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"

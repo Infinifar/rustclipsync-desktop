@@ -1,0 +1,12 @@
+/target/
+**/bin/
+**/obj/
+/.vs/
+*.user
+*.pfx
+*.key
+.env
+
+*.key.dpapi
+*.state
+*.tmp
