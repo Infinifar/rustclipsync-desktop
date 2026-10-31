@@ -38,7 +38,14 @@ public sealed partial class MainWindow : Window
         {
             initialized = true;
             SetMinimumWindowSize(Root.XamlRoot.RasterizationScale);
-            Root.XamlRoot.Changed += (_, _) => SetMinimumWindowSize(Root.XamlRoot.RasterizationScale);
+            var minimumScale = Root.XamlRoot.RasterizationScale;
+            Root.XamlRoot.Changed += (xamlRoot, _) => {
+                if (!closed && Math.Abs(xamlRoot.RasterizationScale - minimumScale) > 0.01)
+                {
+                    minimumScale = xamlRoot.RasterizationScale;
+                    SetMinimumWindowSize(minimumScale);
+                }
+            };
             if (config is not null) { try { AgentClient.Start(); } catch { Show("无法启动后台", "请确认完整安装了 RustClipSync。", InfoBarSeverity.Error); } }
             await Refresh(); timer.Start();
         };

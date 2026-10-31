@@ -60,7 +60,7 @@ do { $stored = Get-Content "$data/config.json" -Raw | ConvertFrom-Json; if ($sto
 if (!$stored.history.enabled -or $stored.history.days -ne 7) { throw 'WinUI settings were not saved by the backend' }
 # Closing the UI must leave exactly one background process; stop it explicitly.
 $ui.CloseMainWindow() | Out-Null
-if (!$ui.WaitForExit(10000)) { throw 'Paired UI did not exit' }
+if (!$ui.WaitForExit(10000) -or $ui.ExitCode -ne 0) { throw 'Paired UI did not exit cleanly' }
 $background = @(Get-Process -Name rustclipsync-agent -ErrorAction SilentlyContinue | Where-Object Path -eq (Join-Path $destination 'rustclipsync-agent.exe'))
 if ($background.Count -ne 1) { throw 'Closing UI did not preserve exactly one background process' }
 $request = @{id=[Guid]::NewGuid().ToString();ipcVersion=1;method='quit';params=@{}} | ConvertTo-Json -Compress
