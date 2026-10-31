@@ -4,7 +4,7 @@ if (![IO.Path]::GetFullPath($env:LOCALAPPDATA).StartsWith($isolatedPrefix,[Strin
 Add-Type @'
 using System;using System.Runtime.InteropServices;
 public static class InspectorWindowTest {
- [DllImport("user32.dll",CharSet=CharSet.Unicode)] public static extern IntPtr FindWindow(string cls,string name);
+ [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr window,uint flags);
  [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr window);
  [DllImport("user32.dll")] public static extern IntPtr GetWindowLongPtr(IntPtr window,int index);
  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr window,int command);
@@ -14,21 +14,26 @@ public static class InspectorWindowTest {
 '@
 Invoke-Control NavHome
 $mainWindow = $script:window
-$mainHandle = [IntPtr]$mainWindow.Current.NativeWindowHandle
+$mainHandle = [InspectorWindowTest]::GetAncestor([IntPtr]$mainWindow.Current.NativeWindowHandle,2)
+function Get-InspectorWindows {
+    return [System.Windows.Automation.AutomationElement]::RootElement.FindAll([System.Windows.Automation.TreeScope]::Children,[System.Windows.Automation.AndCondition]::new([System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ProcessIdProperty,$ui.Id),[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,'敏感收件区')))
+}
 Invoke-Control OpenSensitiveWindow
 $end = (Get-Date).AddSeconds(15)
-do { $inspectorHandle = [InspectorWindowTest]::FindWindow($null,'敏感收件区'); if ($inspectorHandle -ne [IntPtr]::Zero) { break }; Start-Sleep -Milliseconds 100 } while ((Get-Date) -lt $end)
-if ($inspectorHandle -eq [IntPtr]::Zero) {
+do { $inspectors = @(Get-InspectorWindows); if ($inspectors.Count -eq 1) { break }; Start-Sleep -Milliseconds 100 } while ((Get-Date) -lt $end)
+if ($inspectors.Count -ne 1) {
     Save-Screen 'failed-sensitive-window'
     if (Test-Path "$destination/inbox-window-error.log") { Get-Content "$destination/inbox-window-error.log"; Copy-Item "$destination/inbox-window-error.log" "$root/dist/installer/inbox-window-error.log" }
     $windows = [System.Windows.Automation.AutomationElement]::RootElement.FindAll([System.Windows.Automation.TreeScope]::Children,[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ProcessIdProperty,$ui.Id))
     foreach ($element in $windows) { Write-Output "Native UI window: $($element.Current.Name) [$($element.Current.NativeWindowHandle)]" }
     throw 'Sensitive inspector did not open'
 }
+$inspector = $inspectors[0]
+$inspectorHandle = [InspectorWindowTest]::GetAncestor([IntPtr]$inspector.Current.NativeWindowHandle,2)
 [uint32]$inspectorPid = 0
 [InspectorWindowTest]::GetWindowThreadProcessId($inspectorHandle,[ref]$inspectorPid) | Out-Null
 if ($inspectorPid -ne $ui.Id -or ![InspectorWindowTest]::IsIconic($mainHandle)) { throw 'Inspector is not separate from the automatically minimized main window' }
-$script:window = [System.Windows.Automation.AutomationElement]::FromHandle($inspectorHandle)
+$script:window = $inspector
 $end = (Get-Date).AddSeconds(15)
 do { if ((Get-Control RevealSensitiveText).Current.IsEnabled) { break }; Start-Sleep -Milliseconds 100 } while ((Get-Date) -lt $end)
 if (!(Get-Control RevealSensitiveText).Current.IsEnabled) { throw 'Inspector could not read inbox metadata' }
@@ -56,8 +61,9 @@ if (([InspectorWindowTest]::GetWindowLongPtr($inspectorHandle,-20).ToInt64() -ba
 [InspectorWindowTest]::ShowWindow($mainHandle,9) | Out-Null
 $script:window = $mainWindow
 Invoke-Control OpenSensitiveWindow
-if ([InspectorWindowTest]::FindWindow($null,'敏感收件区') -ne $inspectorHandle -or ![InspectorWindowTest]::IsIconic($mainHandle)) { throw 'Repeated detach did not reuse inspector/minimize main' }
-$script:window = [System.Windows.Automation.AutomationElement]::FromHandle($inspectorHandle)
+$inspectors = @(Get-InspectorWindows)
+if ($inspectors.Count -ne 1 -or [InspectorWindowTest]::GetAncestor([IntPtr]$inspectors[0].Current.NativeWindowHandle,2) -ne $inspectorHandle -or ![InspectorWindowTest]::IsIconic($mainHandle)) { throw 'Repeated detach did not reuse inspector/minimize main' }
+$script:window = $inspector
 Invoke-Control DeleteSensitiveText
 $end = (Get-Date).AddSeconds(15)
 do { if (!(Get-Control RevealSensitiveText).Current.IsEnabled) { break }; Start-Sleep -Milliseconds 100 } while ((Get-Date) -lt $end)
