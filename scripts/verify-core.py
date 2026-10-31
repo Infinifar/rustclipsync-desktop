@@ -6,7 +6,7 @@ from pathlib import Path
 root=Path(__file__).resolve().parents[1]/'agent/vendor/rustclipsync-core'
 manifest=json.loads((root/'UPSTREAM.json').read_text())
 expected=set(manifest['files'])|{'UPSTREAM.json'}
-actual={str(p.relative_to(root)) for p in root.rglob('*') if p.is_file()}
+actual={p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
 if any(p.is_symlink() for p in root.rglob('*')) or expected!=actual:
     raise SystemExit('Shared core snapshot has unexpected or missing files.')
 for name,digest in manifest['files'].items():
