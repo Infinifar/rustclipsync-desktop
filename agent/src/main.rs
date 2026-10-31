@@ -16,7 +16,7 @@ fn main() {
     if let Err(error) = entry() {
         eprintln!("RustClipSync: {error}");
         #[cfg(windows)]
-        if std::env::args().nth(1).as_deref() == Some("run") {
+        if std::env::args().nth(1).is_none_or(|arg| arg == "run") {
             unsafe {
                 windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW(
                     std::ptr::null_mut(),

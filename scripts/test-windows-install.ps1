@@ -9,11 +9,23 @@ if ($process.ExitCode -ne 0) { Get-Content $log -Tail 80; throw "Install failed:
 if (!(Test-Path "$destination/RustClipSync.exe") -or !(Test-Path "$destination/rustclipsync-agent.exe")) { throw 'Installed executables are missing' }
 # Check icons embedded in the actual delivered files, not only loose assets.
 Add-Type -AssemblyName System.Drawing
+$reference = [Drawing.Icon]::new("$root/assets/rustclipsync.ico",32,32)
+$expected = $reference.ToBitmap()
 foreach ($name in @('RustClipSync.exe','rustclipsync-agent.exe')) {
     $icon = [Drawing.Icon]::ExtractAssociatedIcon((Join-Path $destination $name))
     if (!$icon) { throw "No icon: $name" }
-    $icon.Dispose()
+    $actual = $icon.ToBitmap()
+    if ($actual.Size -ne $expected.Size) { throw "Unexpected icon dimensions: $name" }
+    $different = 0
+    for ($y=0;$y -lt $expected.Height;$y++) {
+        for ($x=0;$x -lt $expected.Width;$x++) {
+            if ($actual.GetPixel($x,$y).ToArgb() -ne $expected.GetPixel($x,$y).ToArgb()) { $different++ }
+        }
+    }
+    $actual.Dispose(); $icon.Dispose()
+    if ($different -ne 0) { throw "Embedded icon differs from Omaclipsync artwork: $name ($different pixels)" }
 }
+$expected.Dispose(); $reference.Dispose()
 # Use a private app-data root so the setup window is guaranteed to be first-run.
 $originalData = $env:LOCALAPPDATA
 $env:LOCALAPPDATA = Join-Path $env:RUNNER_TEMP 'RustClipSync-first-run-data'
