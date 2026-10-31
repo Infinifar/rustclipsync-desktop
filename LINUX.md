@@ -108,6 +108,8 @@ python3 scripts/package-linux.py arch --distro arch
 运行产物位于 `build/linux/rustclipsync`；完整暂存目录为 `dist/linux-root/usr/`，
 可从其 `bin/rustclipsync` 启动界面及相邻 libexec 后台。
 DEB 构建额外需要 dpkg-dev，RPM 需要 rpmbuild，Arch 需要 bsdtar 和 zstd。
+Arch 也可在本源码目录的 `packaging/linux/` 下运行 `makepkg -si`；该 PKGBUILD
+使用当前本地检出，并非已发布到 AUR 的配方。
 工具可生成带发行版基线名称的 tar.gz，仍依赖系统 Qt，不能视为通用 AppImage。
 Flatpak、AppImage、ARM64 不在本轮发布范围。
 
@@ -119,6 +121,9 @@ Flatpak、AppImage、ARM64 不在本轮发布范围。
 ```bash
 # 安装 Xvfb、dbus-run-session、gnome-keyring-daemon 后运行
 python3 scripts/test-linux-native.py
+
+# 已安装 Sway 时，以普通用户运行无头 Wayland 验证
+python3 scripts/test-linux-native.py --wayland
 ```
 
 若已经构建暂存安装目录，还会运行实际 Qt 界面到 Rust 后台的集成检查。

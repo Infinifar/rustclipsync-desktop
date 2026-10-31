@@ -2,6 +2,7 @@
 """Package the same staged client with native distribution dependency metadata."""
 import argparse
 import hashlib
+import platform
 from pathlib import Path
 import shutil
 import subprocess
@@ -21,6 +22,8 @@ def main():
     parser.add_argument("format", choices=["deb", "rpm", "arch", "tar"])
     parser.add_argument("--distro", required=True, help="Distribution and release used to compile these binaries")
     options = parser.parse_args()
+    if platform.machine().lower() not in ("x86_64", "amd64"):
+        raise SystemExit("This packaging matrix currently supports x86_64 only")
     stage = ROOT / "dist/linux-root"
     output = ROOT / "dist/linux-packages"
     output.mkdir(parents=True, exist_ok=True)
@@ -36,7 +39,7 @@ Section: utils
 Priority: optional
 Architecture: amd64
 Maintainer: Infinifar <infinifar@users.noreply.github.com>
-Depends: libdbus-1-3, libqt6core6 (>= 6.4), libqt6gui6 (>= 6.4), libqt6network6 (>= 6.4), libqt6qml6 (>= 6.4), libqt6quick6 (>= 6.4), libqt6quickcontrols2-6 (>= 6.4), qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-window, qml6-module-qtquick-templates, qml6-module-qtqml-workerscript, qml6-module-qtqml-models, qt6-wayland
+Depends: libdbus-1-3, libqt6core6 (>= 6.4), libqt6gui6 (>= 6.4), libqt6network6 (>= 6.4), libqt6qml6 (>= 6.4), libqt6quick6 (>= 6.4), libqt6quickcontrols2-6 (>= 6.4), qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-window, qml6-module-qtquick-templates, qml6-module-qtqml, qml6-module-qtqml-workerscript, qml6-module-qtqml-models, qt6-wayland
 Recommends: gnome-keyring | kwallet6
 Description: RustClipSync native Linux desktop client
  Lightweight Rust clipboard synchronization with an independent Qt 6/QML UI.
@@ -63,9 +66,9 @@ Description: RustClipSync native Linux desktop client
         # A pacman package includes all file/directory members in .MTREE.
         files = [p for p in stage.rglob("*") if p.is_file()]
         (stage / ".PKGINFO").write_text(f"pkgname = rustclipsync-desktop\npkgver = {VERSION}-1\npkgdesc = RustClipSync native Qt 6 and Rust client\nurl = https://github.com/Infinifar/rustclipsync-desktop\nbuilddate = 0\npackager = Infinifar\nsize = {sum(p.stat().st_size for p in files)}\narch = x86_64\nlicense = MIT\ndepend = qt6-base\ndepend = qt6-declarative\ndepend = qt6-wayland\ndepend = dbus\noptdepend = gnome-keyring: Secret Service key storage\noptdepend = kwallet: Secret Service key storage\n")
-        mtree = subprocess.run(["bsdtar", "-czf", "-", "--format=mtree", "--options=!all,use-set,type,uid,gid,mode,time,size,sha256", "-C", str(stage), "."], check=True, capture_output=True).stdout
+        mtree = subprocess.run(["bsdtar", "--uid", "0", "--gid", "0", "-czf", "-", "--format=mtree", "--options=!all,use-set,type,uid,gid,mode,time,size,sha256", "-C", str(stage), "."], check=True, capture_output=True).stdout
         (stage / ".MTREE").write_bytes(mtree)
-        run("bsdtar", "--zstd", "-cf", str(output / (prefix + ".pkg.tar.zst")), "-C", str(stage), ".")
+        run("bsdtar", "--uid", "0", "--gid", "0", "--zstd", "-cf", str(output / (prefix + ".pkg.tar.zst")), "-C", str(stage), ".")
         (stage / ".PKGINFO").unlink()
         (stage / ".MTREE").unlink()
     else:

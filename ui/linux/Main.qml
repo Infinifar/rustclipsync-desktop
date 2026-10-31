@@ -51,6 +51,7 @@ ApplicationWindow {
         for (const key in changes) next[key] = changes[key]
         backend.saveSettings(next)
     }
+    function filterSettings() { return {mode: ["off", "blacklist", "whitelist"][filterMode.currentIndex], patterns: patterns.text.split("\n").filter(function(p) { return p.length > 0 }), downloads: filterDownloads.checked} }
     function historySettings(changes) {
         const value = JSON.parse(JSON.stringify(config.history || ({enabled: false, days: 7, limit: 50})))
         for (const key in changes) value[key] = changes[key]
@@ -318,7 +319,10 @@ ApplicationWindow {
                         TextArea { id: patterns; placeholderText: qsTr("每行一个表达式，最多 32 条"); wrapMode: TextEdit.WrapAnywhere }
                     }
                     CheckBox { id: filterDownloads; text: qsTr("同时过滤接收内容"); Layout.leftMargin: 24 }
-                    Button { text: qsTr("保存过滤规则"); enabled: online && !backend.busy; Layout.leftMargin: 24; onClicked: updateConfig({filter: {mode: ["off", "blacklist", "whitelist"][filterMode.currentIndex], patterns: patterns.text.split("\n").filter(function(p) { return p.length > 0 }), downloads: filterDownloads.checked}}) }
+                    Button { text: qsTr("保存过滤规则"); enabled: online && !backend.busy; Layout.leftMargin: 24; onClicked: updateConfig({filter: filterSettings()}) }
+                    TextField { id: filterSample; placeholderText: qsTr("输入非敏感样例测试过滤规则"); Layout.fillWidth: true; Layout.leftMargin: 24; Layout.rightMargin: 24; maximumLength: 8192 }
+                    Button { text: qsTr("测试过滤规则"); enabled: online && !backend.busy; Layout.leftMargin: 24; onClicked: backend.testFilter(filterSettings(), filterSample.text) }
+                    Label { text: backend.filterResult; visible: text.length > 0; wrapMode: Text.Wrap; Layout.fillWidth: true; Layout.leftMargin: 24; Layout.rightMargin: 24 }
                     RowLayout {
                         Layout.leftMargin: 24; Layout.topMargin: 12
                         Label { text: qsTr("备用检查间隔（秒）") }
@@ -352,6 +356,8 @@ ApplicationWindow {
     Dialog {
         id: quitDialog
         title: qsTr("退出同步后台？")
+        implicitWidth: 420
+        width: Math.min(420, window.width - 48)
         anchors.centerIn: Overlay.overlay
         modal: true
         standardButtons: Dialog.Ok | Dialog.Cancel

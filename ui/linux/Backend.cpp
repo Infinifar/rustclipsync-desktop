@@ -16,6 +16,8 @@
 #include <QUuid>
 #include <QtEndian>
 #include <sys/socket.h>
+#include <sys/file.h>
+#include <fcntl.h>
 #include <unistd.h>
 
 namespace { constexpr quint32 MaxFrame = 256 * 1024; }
@@ -109,7 +111,9 @@ void Backend::refresh() {
     m_polling = true;
     rpc("getStatus", {}, [this](const QJsonObject &result) {
         const auto previousId = m_status.value("inbox").toMap().value("id").toString();
+        const auto historyRevision = m_status.value("historyRevision");
         m_status = result.toVariantMap();
+        if (m_historyRequested && historyRevision != m_status.value("historyRevision")) searchHistory(m_query, m_favorites, m_offset);
         if (previousId != m_status.value("inbox").toMap().value("id").toString()) hideInbox();
         emit changed();
     }, true);
@@ -153,7 +157,21 @@ void Backend::pair(const QString &server, const QString &account, const QString 
     connect(probe, &QLocalSocket::connected, probe, [this, probe, server, account, password, reset] {
         probe->deleteLater();
         rpc("quit", {}, [this, server, account, password, reset](const QJsonObject &) {
-            QTimer::singleShot(500, this, [this, server, account, password, reset] { beginPair(server, account, password, reset); });
+            // The long-poll worker may need its current timeout to stop. Wait
+            // for the actual profile lock instead of racing a fixed delay.
+            m_busy = true; emit changed();
+            auto waiter = new QTimer(this);
+            waiter->setInterval(100);
+            connect(waiter, &QTimer::timeout, waiter, [this, waiter, server, account, password, reset] {
+                const auto path = QFile::encodeName(m_directory + "/agent.lock");
+                const int file = open(path.constData(), O_RDWR | O_NOFOLLOW | O_CLOEXEC);
+                const bool available = file >= 0 && flock(file, LOCK_EX | LOCK_NB) == 0;
+                if (file >= 0) close(file);
+                if (!available) return;
+                waiter->stop(); waiter->deleteLater(); beginPair(server, account, password, reset);
+            });
+            QTimer::singleShot(65000, waiter, [this, waiter] { waiter->stop(); waiter->deleteLater(); m_busy = false; fail("后台尚未停止，请稍后重新配对。"); });
+            waiter->start();
         });
     });
     connect(probe, &QLocalSocket::errorOccurred, probe, [this, probe, server, account, password, reset](QLocalSocket::LocalSocketError) {
@@ -183,6 +201,7 @@ void Backend::beginPair(const QString &server, const QString &account, const QSt
     process->start();
 }
 void Backend::searchHistory(const QString &query, bool favorites, int offset) {
+    m_historyRequested = true;
     m_query = query; m_favorites = favorites; m_offset = qMax(0, offset);
     rpc("listHistory", {{"query", query}, {"favorites", favorites}, {"offset", m_offset}}, [this](const QJsonObject &result) {
         m_history = result.value("items").toArray().toVariantList(); m_total = result.value("total").toInt(); emit historyChanged();
@@ -230,4 +249,11 @@ QString Backend::receivedTime(qint64 seconds) const { return seconds > 0 ? QLoca
 QString Backend::stateLabel(const QString &state) const {
     static const QHash<QString, QString> labels = {{"connected", "已连接"}, {"connecting", "正在连接"}, {"paused", "已暂停自动同步"}, {"offline", "网络连接失败，将自动重试"}, {"credentials", "凭据不正确，请重新配对"}, {"conflict", "存在同步冲突，请明确发送或接收"}, {"expired", "待发送内容已过期，请重新复制"}, {"re_pair", "服务端状态已改变，需要重新配对"}, {"storage_error", "加密存储不可用，请检查密钥环与文件权限"}, {"clipboard_error", "剪贴板访问失败，请检查桌面支持"}, {"settings_changed", "设置已改变，请刷新后重试"}, {"history_error", "历史记录不可用"}, {"invalid_request", "操作已失效，请刷新后重试"}, {"needs_restart", "后台需要重新启动"}};
     return labels.value(state, state.isEmpty() ? QStringLiteral("后台未连接") : state);
+}
+
+void Backend::testFilter(const QVariantMap &filter, const QString &text) {
+    rpc("testFilter", {{"filter", QJsonObject::fromVariantMap(filter)}, {"text", text}}, [this](const QJsonObject &result) {
+        m_filterResult = QString("%1 · 发送：%2 · 接收：%3").arg(result.value("matched").toBool() ? "匹配" : "未匹配", result.value("uploadAllowed").toBool() ? "允许" : "过滤", result.value("downloadAllowed").toBool() ? "允许" : "过滤");
+        emit changed();
+    });
 }

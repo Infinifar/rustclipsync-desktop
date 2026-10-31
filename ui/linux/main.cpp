@@ -58,6 +58,8 @@ int main(int argc, char **argv) {
     }
     Backend backend(directory, smoke);
     QQmlApplicationEngine engine;
+    bool qmlWarnings = false;
+    QObject::connect(&engine, &QQmlEngine::warnings, &app, [&qmlWarnings](const QList<QQmlError> &) { qmlWarnings = true; });
     engine.rootContext()->setContextProperty("backend", &backend);
     engine.rootContext()->setContextProperty("initialAction", action);
     engine.rootContext()->setContextProperty("initialPage", qBound(0, parser.value("page").toInt(), 3));
@@ -82,18 +84,31 @@ int main(int argc, char **argv) {
     });
     QObject::connect(&backend, &Backend::quitRequested, &app, &QCoreApplication::quit);
     if (!smoke) QTimer::singleShot(0, root, [activate, action] { activate(action); });
-    if (smoke) QTimer::singleShot(1000, &app, [&app, root] {
+    if (smoke) QTimer::singleShot(1000, &app, [&app, root, &qmlWarnings] {
         QVariant result;
         const bool invoked = QMetaObject::invokeMethod(root, "smokeTest", Q_RETURN_ARG(QVariant, result));
-        app.exit(invoked && result.toBool() ? 0 : 2);
+        app.exit(invoked && result.toBool() && !qmlWarnings ? 0 : 2);
     });
     if (integration) {
         auto verification = new QTimer(&app);
         verification->setInterval(100);
-        QObject::connect(verification, &QTimer::timeout, &app, [&app, root] {
+        QObject::connect(verification, &QTimer::timeout, &app, [&app, root, verification, &qmlWarnings] {
+            if (qmlWarnings) { app.exit(8); return; }
             QVariant result;
             if (!QMetaObject::invokeMethod(root, "nativeTestStep", Q_RETURN_ARG(QVariant, result))) { app.exit(4); return; }
-            if (result.toInt() != 0) app.exit(result.toInt() == 1 ? 0 : 5);
+            if (result.toInt() != 0) {
+                verification->stop();
+                if (result.toInt() != 1) { app.exit(5); return; }
+                QTimer::singleShot(250, &app, [&app, root] {
+                    const auto capture = qEnvironmentVariable("RCS_LINUX_CAPTURE_DIR");
+                    if (!capture.isEmpty()) {
+                        QDir().mkpath(capture);
+                        const auto window = qobject_cast<QQuickWindow *>(root);
+                        if (!window || !window->grabWindow().save(capture + "/native-paired-home.png")) { app.exit(7); return; }
+                    }
+                    app.exit(0);
+                });
+            }
         });
         verification->start();
         QTimer::singleShot(25000, &app, [&app] { qCritical("Native UI verification timed out"); app.exit(6); });

@@ -15,6 +15,7 @@ class Backend : public QObject {
     Q_PROPERTY(bool busy READ busy NOTIFY changed)
     Q_PROPERTY(QString error READ error NOTIFY changed)
     Q_PROPERTY(QString inboxText READ inboxText NOTIFY inboxTextChanged)
+    Q_PROPERTY(QString filterResult READ filterResult NOTIFY changed)
     Q_PROPERTY(QString theme READ theme WRITE setTheme NOTIFY appearanceChanged)
     Q_PROPERTY(double textScale READ textScale WRITE setTextScale NOTIFY appearanceChanged)
     Q_PROPERTY(bool autostart READ autostart WRITE setAutostart NOTIFY changed)
@@ -27,6 +28,7 @@ public:
     bool busy() const { return m_busy; }
     QString error() const { return m_error; }
     QString inboxText() const { return m_inboxText; }
+    QString filterResult() const { return m_filterResult; }
     QString theme() const;
     double textScale() const;
     bool autostart() const;
@@ -41,6 +43,7 @@ public:
     Q_INVOKABLE void searchHistory(const QString &query = {}, bool favorites = false, int offset = 0);
     Q_INVOKABLE void revealInbox();
     Q_INVOKABLE void hideInbox();
+    Q_INVOKABLE void testFilter(const QVariantMap &filter, const QString &text);
     Q_INVOKABLE QString stateLabel(const QString &state) const;
     Q_INVOKABLE QString receivedTime(qint64 seconds) const;
     QString directory() const { return m_directory; }
@@ -61,11 +64,11 @@ private:
     QString startupPath() const;
     QStringList agentArguments(const QStringList &args) const;
     void fail(const QString &message);
-    QString m_directory, m_error, m_inboxText, m_revealedId;
+    QString m_directory, m_error, m_inboxText, m_revealedId, m_filterResult;
     QVariantMap m_status;
     QVariantList m_history;
     int m_total = 0;
-    bool m_busy = false, m_smoke = false, m_polling = false;
+    bool m_busy = false, m_smoke = false, m_polling = false, m_historyRequested = false;
     QSettings m_settings;
     QTimer m_poll;
     QString m_query;

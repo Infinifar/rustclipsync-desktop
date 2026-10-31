@@ -1,0 +1,27 @@
+# Build from this repository checkout: cd packaging/linux && makepkg -si
+# This is a local source recipe; a future AUR submission must pin its source archive.
+pkgname=rustclipsync-desktop
+pkgver=0.2.3
+pkgrel=1
+pkgdesc='RustClipSync clipboard client with a Qt 6/QML interface and Rust background agent'
+arch=('x86_64')
+url='https://github.com/Infinifar/rustclipsync-desktop'
+license=('MIT')
+depends=('qt6-base' 'qt6-declarative' 'qt6-wayland' 'dbus')
+makedepends=('rust' 'cmake' 'ninja' 'pkgconf')
+optdepends=('gnome-keyring: Secret Service key storage' 'kwallet: Secret Service key storage')
+options=('!debug')
+source=()
+sha256sums=()
+
+build() {
+    cd "$startdir/../.."
+    cargo build --locked --release --bin rustclipsync-agent
+    cmake -S ui/linux -B build/arch -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+    cmake --build build/arch
+}
+
+package() {
+    cd "$startdir/../.."
+    DESTDIR="$pkgdir" cmake --install build/arch
+}

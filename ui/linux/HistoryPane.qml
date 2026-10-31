@@ -49,6 +49,8 @@ ColumnLayout {
     Dialog {
         id: clearDialog
         title: qsTr("清空本机普通历史？")
+        implicitWidth: 420
+        width: Math.min(420, pane.width)
         modal: true
         anchors.centerIn: Overlay.overlay
         standardButtons: Dialog.Ok | Dialog.Cancel

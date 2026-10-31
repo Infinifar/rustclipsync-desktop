@@ -1,11 +1,28 @@
 name: Linux desktop
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
+  wayland:
+    name: Native Wayland clipboard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Install headless desktop and Secret Service
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sway dbus-x11 gnome-keyring libdbus-1-dev pkg-config
+          rustup toolchain install 1.99.1 --profile minimal
+          rustup override set 1.99.1
+      - name: Verify native Wayland transfers in an isolated compositor
+        run: python3 scripts/test-linux-native.py --wayland
   distributions:
     name: ${{ matrix.distro }} x86_64
     runs-on: ubuntu-24.04
@@ -20,6 +37,7 @@ jobs:
           - { distro: arch, image: 'archlinux:base-devel', format: arch, family: arch }
     container:
       image: ${{ matrix.image }}
+      options: --cap-add IPC_LOCK
     defaults:
       run:
         shell: bash
@@ -32,7 +50,7 @@ jobs:
           case "$FAMILY" in
             debian)
               apt-get update
-              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git ca-certificates curl build-essential pkg-config cmake ninja-build python3 libdbus-1-dev qt6-base-dev qt6-declarative-dev qt6-wayland qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-window qml6-module-qtquick-templates qml6-module-qtqml-workerscript qml6-module-qtqml-models dbus-x11 gnome-keyring xvfb dpkg-dev desktop-file-utils
+              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git ca-certificates curl build-essential pkg-config cmake ninja-build python3 libdbus-1-dev qt6-base-dev qt6-declarative-dev qt6-wayland qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-window qml6-module-qtquick-templates qml6-module-qtqml qml6-module-qtqml-workerscript qml6-module-qtqml-models dbus-x11 gnome-keyring xvfb dpkg-dev desktop-file-utils
               ;;
             fedora)
               dnf install -y git ca-certificates curl gcc gcc-c++ make pkgconf-pkg-config cmake ninja-build python3 dbus-devel qt6-qtbase-devel qt6-qtdeclarative-devel qt6-qtwayland dbus-daemon gnome-keyring xorg-x11-server-Xvfb rpm-build desktop-file-utils
@@ -68,12 +86,25 @@ jobs:
       - name: Verify QML startup and native clipboard/keyring/IPC
         run: |
           install -d -m 700 /tmp/rcs-ui-runtime
-          XDG_RUNTIME_DIR=/tmp/rcs-ui-runtime QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software build/linux/rustclipsync --data-dir /tmp/rcs-ui-profile --smoke-test
+          XDG_RUNTIME_DIR=/tmp/rcs-ui-runtime QT_QPA_PLATFORM=offscreen QT_QPA_PLATFORMTHEME=generic QT_QUICK_BACKEND=software build/linux/rustclipsync --data-dir /tmp/rcs-ui-profile --smoke-test
           # Never exercise the runner's original D-Bus or clipboard.
-          python3 scripts/test-linux-native.py
+          native_test=$(cargo test --locked --test linux_native --no-run --message-format=json | python3 -c 'import json,sys; print(next(m["executable"] for line in sys.stdin if (m:=json.loads(line)).get("reason")=="compiler-artifact" and m.get("target",{}).get("name")=="linux_native" and m.get("executable")))')
+          useradd --create-home --uid 1001 rcs-test
+          runuser -u rcs-test -- env RCS_LINUX_TEST_BINARY="$native_test" python3 scripts/test-linux-native.py
           desktop-file-validate packaging/linux/io.github.infinifar.rustclipsync.desktop
       - name: Create native distribution package
         run: python3 scripts/package-linux.py '${{ matrix.format }}' --distro '${{ matrix.distro }}'
+      - name: Install and start the packaged client in this disposable container
+        env:
+          FORMAT: ${{ matrix.format }}
+        run: |
+          case "$FORMAT" in
+            deb) dpkg -i dist/linux-packages/*.deb ;;
+            rpm) rpm -i dist/linux-packages/*.rpm ;;
+            arch) pacman -U --noconfirm dist/linux-packages/*.pkg.tar.zst ;;
+          esac
+          /usr/libexec/rustclipsync/rustclipsync-agent --help
+          XDG_RUNTIME_DIR=/tmp/rcs-ui-runtime QT_QPA_PLATFORM=offscreen QT_QPA_PLATFORMTHEME=generic QT_QUICK_BACKEND=software /usr/bin/rustclipsync --data-dir /tmp/rcs-installed-profile --smoke-test
       - name: Upload distribution package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
