@@ -22,6 +22,9 @@ foreach ($file in $xbf) {
     }
 }
 Copy-Item "$root/assets/rustclipsync.png","$root/assets/rustclipsync.ico" "$resources/Assets" -Force
+# Merge WinUI's embedded theme/control resources into the unpackaged app index.
+# Keeping only our XBF entries makes XamlControlsResources fail at startup.
+Get-ChildItem $bundle -Filter '*.pri' | Where-Object Name -ne 'resources.pri' | Copy-Item -Destination $resources -Force
 if (!(Test-Path "$bundle/Assets/rustclipsync.ico")) { throw 'Application icon asset is missing' }
 $makepri = Get-ChildItem "${env:ProgramFiles(x86)}/Windows Kits/10/bin" -Recurse -Filter 'makepri.exe' |
     Where-Object { $_.Directory.Name -eq 'x64' } | Sort-Object FullName -Descending | Select-Object -First 1
