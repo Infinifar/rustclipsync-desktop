@@ -16,6 +16,7 @@ use windows_sys::Win32::{
     UI::{Shell::*, WindowsAndMessaging::*},
 };
 const TRAY_CALLBACK: u32 = WM_APP + 1;
+const OPEN: usize = 1000;
 const PAUSE: usize = 1001;
 const QUIT: usize = 1002;
 struct Context {
@@ -34,6 +35,7 @@ impl Window {
             let mut wc: WNDCLASSW = mem::zeroed();
             wc.lpfnWndProc = Some(procedure);
             wc.hInstance = instance;
+            wc.hIcon = LoadIconW(instance, 1usize as _);
             wc.lpszClassName = class.as_ptr();
             if RegisterClassW(&wc) == 0 && GetLastError() != ERROR_CLASS_ALREADY_EXISTS {
                 return Err(io::Error::last_os_error());
@@ -145,11 +147,16 @@ unsafe extern "system" fn procedure(
             tray(hwnd, control, NIM_MODIFY);
             0
         }
+        TRAY_CALLBACK if lparam as u32 == WM_LBUTTONDBLCLK => {
+            open_settings();
+            0
+        }
         TRAY_CALLBACK if matches!(lparam as u32, WM_RBUTTONUP | WM_CONTEXTMENU) => {
             let menu = CreatePopupMenu();
             if menu.is_null() {
                 return 0;
             }
+            AppendMenuW(menu, MF_STRING, OPEN, wide("打开 RustClipSync").as_ptr());
             let paused = control.paused.load(Ordering::SeqCst);
             AppendMenuW(
                 menu,
@@ -177,6 +184,9 @@ unsafe extern "system" fn procedure(
             ) as usize;
             DestroyMenu(menu);
             PostMessageW(hwnd, WM_NULL, 0, 0);
+            if selected == OPEN {
+                open_settings();
+            }
             if selected == PAUSE {
                 control.paused.store(!paused, Ordering::SeqCst);
                 control.generation.fetch_add(1, Ordering::SeqCst);
@@ -218,10 +228,22 @@ unsafe fn tray(hwnd: HWND, control: &Control, action: u32) -> bool {
     data.uID = 1;
     data.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     data.uCallbackMessage = TRAY_CALLBACK;
-    data.hIcon = LoadIconW(ptr::null_mut(), IDI_APPLICATION);
+    data.hIcon = LoadIconW(GetModuleHandleW(ptr::null()), 1usize as _);
+    if data.hIcon.is_null() {
+        data.hIcon = LoadIconW(ptr::null_mut(), IDI_APPLICATION);
+    }
     let state = control.status.lock().map(|v| *v).unwrap_or("error");
     let tooltip = wide(&format!("RustClipSync: {state}"));
     let len = tooltip.len().min(data.szTip.len() - 1);
     data.szTip[..len].copy_from_slice(&tooltip[..len]);
     Shell_NotifyIconW(action, &data) != 0
+}
+
+fn open_settings() {
+    if let Ok(exe) = std::env::current_exe() {
+        let ui = exe.with_file_name("RustClipSync.exe");
+        if ui.is_file() {
+            let _ = std::process::Command::new(ui).spawn();
+        }
+    }
 }

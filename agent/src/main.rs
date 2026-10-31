@@ -2,7 +2,11 @@
 use std::io;
 fn main() {
     #[cfg(windows)]
-    if std::env::args().nth(1).as_deref() != Some("run") {
+    if std::env::args()
+        .nth(1)
+        .is_some_and(|arg| arg == "--help" || arg == "pair")
+        && !std::env::args().any(|arg| arg == "--password-stdin")
+    {
         unsafe {
             windows_sys::Win32::System::Console::AttachConsole(
                 windows_sys::Win32::System::Console::ATTACH_PARENT_PROCESS,
@@ -52,8 +56,19 @@ fn entry() -> io::Result<()> {
     };
     use zeroize::Zeroizing;
     let args: Vec<_> = std::env::args().skip(1).collect();
-    if args.first().is_none_or(|arg| arg == "--help") {
-        println!("rustclipsync-agent run\nrustclipsync-agent pair <https-url> <account> [--reset]\nPassword is read from the console; it is never a command-line argument. Exit the running agent before pairing.");
+    if args.is_empty() {
+        let ui = std::env::current_exe()?.with_file_name("RustClipSync.exe");
+        if ui.is_file() {
+            std::process::Command::new(ui).spawn()?;
+            return Ok(());
+        }
+        unsafe {
+            windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW(std::ptr::null_mut(),rustclipsync_agent::windows::wide("此文件是 RustClipSync 后台组件。请运行 RustClipSync 安装程序，或从命令行执行 pair 和 run。\nThis is the background component. Use the RustClipSync installer or the pair/run commands.").as_ptr(),rustclipsync_agent::windows::wide("RustClipSync").as_ptr(),windows_sys::Win32::UI::WindowsAndMessaging::MB_ICONINFORMATION);
+        }
+        return Ok(());
+    }
+    if args.first().is_some_and(|arg| arg == "--help") {
+        println!("rustclipsync-agent run\nrustclipsync-agent pair <https-url> <account> [--reset] [--password-stdin]\nPassword is read from the console or the GUI's anonymous stdin pipe, never command-line arguments.");
         return Ok(());
     }
     let base = PathBuf::from(
@@ -64,7 +79,13 @@ fn entry() -> io::Result<()> {
     storage::ensure_private_dir(&dir)?;
     let _lock = InstanceLock::acquire(&dir)?;
     match args[0].as_str() {
-        "pair" if args.len() == 3 || (args.len() == 4 && args[3] == "--reset") => {
+        "pair"
+            if args.len() >= 3
+                && args.len() <= 5
+                && args[3..]
+                    .iter()
+                    .all(|a| a == "--reset" || a == "--password-stdin") =>
+        {
             let mut config = Config {
                 server: args[1].clone(),
                 user: args[2].clone(),
@@ -73,14 +94,23 @@ fn entry() -> io::Result<()> {
             };
             config.validate()?;
             let existing = storage::read_private(&dir.join("config.json"), 64 * 1024)?;
-            if existing.is_some() && args.len() != 4 {
+            if existing.is_some() && !args[3..].iter().any(|a| a == "--reset") {
                 return Err(io::Error::other(
                     "already configured; --reset explicitly replaces the pairing and pending data",
                 ));
             }
-            let password = Zeroizing::new(read_password()?);
-            runtime::pair(&dir, &config, password.to_string(), args.len() == 4)
-                .map_err(|e| io::Error::other(runtime::classify(&e)))?;
+            let password = if args[3..].iter().any(|a| a == "--password-stdin") {
+                rustclipsync_agent::credentials::read_secret(io::stdin().lock())?
+            } else {
+                Zeroizing::new(read_password()?)
+            };
+            runtime::pair(
+                &dir,
+                &config,
+                password.to_string(),
+                args[3..].iter().any(|a| a == "--reset"),
+            )
+            .map_err(|e| io::Error::other(runtime::classify(&e)))?;
             storage::atomic_write(
                 &dir.join("config.json"),
                 &serde_json::to_vec_pretty(&config)?,
@@ -88,7 +118,10 @@ fn entry() -> io::Result<()> {
             println!("Pairing complete. Start rustclipsync-agent run.");
             Ok(())
         }
-        "run" if args.len() == 1 => {
+        "run" | "autostart" if args.len() == 1 => {
+            if args[0] == "autostart" && !dir.join("config.json").is_file() {
+                return Ok(());
+            }
             let bytes = storage::read_private(&dir.join("config.json"), 64 * 1024)?
                 .ok_or_else(|| io::Error::other("run pair first"))?;
             let mut config: Config = serde_json::from_slice(&bytes)?;
