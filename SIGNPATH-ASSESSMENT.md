@@ -4,9 +4,9 @@
 
 | 条件 | 当前情况 |
 | --- | --- |
-| 自有源码和开源许可 | Windows 客户端及共享核心均为 MIT，计划公开；Rust 依赖声明清单见第三方文档 |
+| 自有源码和开源许可 | Windows 客户端及共享核心均为 MIT，已公开；Rust 依赖声明清单见第三方文档 |
 | 维护和构建来源 | GitHub Actions 可追溯构建；Windows 27 项测试、实际 UI 和安装测试通过 |
-| 已发布可执行程序 | 提供明确标注未签名的 0.2.1 版本；申请时使用永久 Release 链接 |
+| 已发布可执行程序 | 提供明确标注未签名的 0.2.1 版本；永久 Release：https://github.com/Infinifar/rustclipsync-desktop/releases/tag/v0.2.1 |
 | 功能和隐私说明 | README、Code signing policy 已准备，包含自动剪贴板传输及服务端可读正文说明 |
 | 维护者 MFA 和审批角色 | 角色已拟定，GitHub API 未返回可验证的 MFA 状态；须维护者确认 GitHub 和 SignPath 双重验证 |
 | 项目信誉 | 新建项目、公开使用记录较少，是否达到可验证信誉要求由基金会决定，没有承诺通过 |

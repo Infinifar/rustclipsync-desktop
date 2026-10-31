@@ -20,7 +20,7 @@ Windows 11 原生剪贴板同步客户端，使用 **WinUI 3 / C# / XAML 界面�
 
 ## 安装与升级
 
-下载 [已验证的 Windows x64 0.2.1 安装产物](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41211210740/artifacts/13046069005)，解压并运行 **RustClipSync-0.2.1-setup-x64.exe**。产物内包含 SHA256SUMS 与实际运行截图。当前为未签名开发安装包。
+下载 [Windows x64 0.2.1 安装包](https://github.com/Infinifar/rustclipsync-desktop/releases/tag/v0.2.1)，下载并运行 **RustClipSync-0.2.1-setup-x64.exe**。发布页附有 SHA256SUMS，实际运行截图见构建产物。当前为未签名开发安装包。
 
 按用户安装，默认无需管理员权限，内含 .NET、WinUI 和应用本地 C++ 运行组件。安装后从开始菜单打开，进入“设置 → 服务端与账户”，填写 HTTPS 根地址、用户名和密码，点击“连接并启动”。
 
