@@ -18,7 +18,13 @@ $mainHandle = [IntPtr]$mainWindow.Current.NativeWindowHandle
 Invoke-Control OpenSensitiveWindow
 $end = (Get-Date).AddSeconds(15)
 do { $inspectorHandle = [InspectorWindowTest]::FindWindow($null,'敏感收件区'); if ($inspectorHandle -ne [IntPtr]::Zero) { break }; Start-Sleep -Milliseconds 100 } while ((Get-Date) -lt $end)
-if ($inspectorHandle -eq [IntPtr]::Zero) { throw 'Sensitive inspector did not open' }
+if ($inspectorHandle -eq [IntPtr]::Zero) {
+    Save-Screen 'failed-sensitive-window'
+    if (Test-Path "$destination/inbox-window-error.log") { Get-Content "$destination/inbox-window-error.log"; Copy-Item "$destination/inbox-window-error.log" "$root/dist/installer/inbox-window-error.log" }
+    $windows = [System.Windows.Automation.AutomationElement]::RootElement.FindAll([System.Windows.Automation.TreeScope]::Children,[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ProcessIdProperty,$ui.Id))
+    foreach ($element in $windows) { Write-Output "Native UI window: $($element.Current.Name) [$($element.Current.NativeWindowHandle)]" }
+    throw 'Sensitive inspector did not open'
+}
 [uint32]$inspectorPid = 0
 [InspectorWindowTest]::GetWindowThreadProcessId($inspectorHandle,[ref]$inspectorPid) | Out-Null
 if ($inspectorPid -ne $ui.Id -or ![InspectorWindowTest]::IsIconic($mainHandle)) { throw 'Inspector is not separate from the automatically minimized main window' }

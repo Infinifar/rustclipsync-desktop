@@ -286,7 +286,13 @@ public sealed partial class MainWindow : Window
             inboxWindow.Activate();
             if (AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter) presenter.Minimize();
         }
-        catch (Exception error) { Error(error); }
+        catch (Exception error)
+        {
+            // Window construction/presentation only: this block never reads an
+            // inbox body, password or other clipboard content.
+            try { File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "inbox-window-error.log"), error.ToString()); } catch { }
+            Show("无法打开敏感收件小窗", $"窗口错误代码：0x{error.HResult:X8}。", InfoBarSeverity.Error);
+        }
     }
     private async void TestFilter_Click(object sender, RoutedEventArgs e)
     {
