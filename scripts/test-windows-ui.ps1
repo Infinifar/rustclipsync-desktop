@@ -1,3 +1,6 @@
+if ($env:GITHUB_ACTIONS -ne 'true' -or [string]::IsNullOrEmpty($env:RUNNER_TEMP) -or [string]::IsNullOrEmpty($destination)) { throw 'This helper must be dot-sourced by the disposable Windows installer test.' }
+$isolatedPrefix = [IO.Path]::GetFullPath($env:RUNNER_TEMP).TrimEnd('\','/') + [IO.Path]::DirectorySeparatorChar
+if (![IO.Path]::GetFullPath($env:LOCALAPPDATA).StartsWith($isolatedPrefix,[StringComparison]::OrdinalIgnoreCase) -or ![IO.Path]::GetFullPath($destination).StartsWith($isolatedPrefix,[StringComparison]::OrdinalIgnoreCase)) { throw 'Refusing to run UI fixtures outside isolated runner directories.' }
 # Exercise actual WinUI controls on a disposable runner.
 Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes
 function Get-Control([string]$id) {

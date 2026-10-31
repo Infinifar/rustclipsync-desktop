@@ -1,5 +1,6 @@
 # Run only on an ephemeral GitHub-hosted Windows desktop.
 $ErrorActionPreference = 'Stop'
+if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_OS -ne 'Windows' -or [string]::IsNullOrEmpty($env:RUNNER_TEMP)) { throw 'Run this installation test only on a disposable GitHub Windows runner.' }
 $root = Split-Path $PSScriptRoot -Parent
 $setup = Get-Item "$root/dist/installer/RustClipSync-*-setup-x64.exe"
 $destination = Join-Path $env:RUNNER_TEMP 'RustClipSync-installed'

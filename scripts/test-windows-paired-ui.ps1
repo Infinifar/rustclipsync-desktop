@@ -1,3 +1,6 @@
+if ($env:GITHUB_ACTIONS -ne 'true' -or [string]::IsNullOrEmpty($env:RUNNER_TEMP) -or [string]::IsNullOrEmpty($destination)) { throw 'This helper must be dot-sourced by the disposable Windows installer test.' }
+$isolatedPrefix = [IO.Path]::GetFullPath($env:RUNNER_TEMP).TrimEnd('\','/') + [IO.Path]::DirectorySeparatorChar
+if (![IO.Path]::GetFullPath($env:LOCALAPPDATA).StartsWith($isolatedPrefix,[StringComparison]::OrdinalIgnoreCase) -or ![IO.Path]::GetFullPath($destination).StartsWith($isolatedPrefix,[StringComparison]::OrdinalIgnoreCase)) { throw 'Refusing to run UI fixtures outside isolated runner directories.' }
 # Synthetic offline 0.1.0-style account, with a DPAPI key and RCS1 encrypted
 # cursor/private inbox. Never contact a deployed service or use real credentials.
 Add-Type -AssemblyName System.Security.Cryptography.ProtectedData
