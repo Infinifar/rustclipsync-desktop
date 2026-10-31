@@ -3,6 +3,8 @@
 import argparse
 import hashlib
 import platform
+import os
+import time
 from pathlib import Path
 import shutil
 import subprocess
@@ -65,10 +67,16 @@ Description: RustClipSync native Linux desktop client
     elif options.format == "arch":
         # A pacman package includes all file/directory members in .MTREE.
         files = [p for p in stage.rglob("*") if p.is_file()]
-        (stage / ".PKGINFO").write_text(f"pkgname = rustclipsync-desktop\npkgver = {VERSION}-1\npkgdesc = RustClipSync native Qt 6 and Rust client\nurl = https://github.com/Infinifar/rustclipsync-desktop\nbuilddate = 0\npackager = Infinifar\nsize = {sum(p.stat().st_size for p in files)}\narch = x86_64\nlicense = MIT\ndepend = qt6-base\ndepend = qt6-declarative\ndepend = qt6-wayland\ndepend = dbus\noptdepend = gnome-keyring: Secret Service key storage\noptdepend = kwallet: Secret Service key storage\n")
+        builddate = int(os.environ.get("SOURCE_DATE_EPOCH", str(int(time.time()))))
+        (stage / ".PKGINFO").write_text(f"pkgname = rustclipsync-desktop\npkgver = {VERSION}-1\npkgdesc = RustClipSync native Qt 6 and Rust client\nurl = https://github.com/Infinifar/rustclipsync-desktop\nbuilddate = {builddate}\npackager = Infinifar\nsize = {sum(p.stat().st_size for p in files)}\narch = x86_64\nlicense = MIT\ndepend = qt6-base\ndepend = qt6-declarative\ndepend = qt6-wayland\ndepend = dbus\noptdepend = gnome-keyring: Secret Service key storage\noptdepend = kwallet: Secret Service key storage\n")
         mtree = subprocess.run(["bsdtar", "--uid", "0", "--gid", "0", "-czf", "-", "--format=mtree", "--options=!all,use-set,type,uid,gid,mode,time,size,sha256", "-C", str(stage), "."], check=True, capture_output=True).stdout
         (stage / ".MTREE").write_bytes(mtree)
-        run("bsdtar", "--uid", "0", "--gid", "0", "--zstd", "-cf", str(output / (prefix + ".pkg.tar.zst")), "-C", str(stage), ".")
+        package = output / (prefix + ".pkg.tar.zst")
+        # libalpm requires these metadata entries at the exact archive root;
+        # archiving '.' prefixes them with './' and pacman rejects the package.
+        run("bsdtar", "--uid", "0", "--gid", "0", "--zstd", "-cf", str(package), "-C", str(stage), ".PKGINFO", ".MTREE", "usr")
+        if shutil.which("pacman"):
+            run("pacman", "--query", "--info", "--file", str(package))
         (stage / ".PKGINFO").unlink()
         (stage / ".MTREE").unlink()
     else:
