@@ -122,3 +122,34 @@ fn oversized_private_file_is_rejected_before_decoding() {
     storage::atomic_write(&path, &[0; 100]).unwrap();
     assert!(storage::read_private(&path, 99).is_err());
 }
+
+#[test]
+fn gui_pairing_reads_anonymous_stdin_without_a_console_or_password_arguments() {
+    use std::{
+        io::Write,
+        process::{Command, Stdio},
+    };
+    let temp = tempfile::tempdir().unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_rustclipsync-agent"))
+        .args(["pair", "https://127.0.0.1:1", "fixture", "--password-stdin"])
+        .env("LOCALAPPDATA", temp.path())
+        .env("NO_PROXY", "127.0.0.1,localhost")
+        .env("no_proxy", "127.0.0.1,localhost")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let secret = "fixture 密码 with spaces";
+    writeln!(child.stdin.take().unwrap(), "{secret}").unwrap();
+    let output = child.wait_with_output().unwrap();
+    assert!(!output.status.success()); // Closed loopback port, no real service.
+    let error = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        error.contains("offline"),
+        "unexpected sanitized failure: {error}"
+    );
+    assert!(!error.contains(secret));
+    assert!(!String::from_utf8_lossy(&output.stdout).contains(secret));
+    assert!(!temp.path().join("RustClipSync/config.json").exists());
+}
