@@ -1,8 +1,8 @@
+<p><img src="assets/omaclipsync.svg" alt="RustClipSync 图标" width="64" height="64"></p>
+
 # RustClipSync Desktop
 
 Windows 11 原生剪贴板同步客户端，使用 **WinUI 3 / C# / XAML 界面与 Rust 常驻后台**。关闭窗口后，已启动的同步继续运行；双击托盘图标可重新打开。
-
-![图标](assets/omaclipsync.svg)
 
 ## 页面与功能
 
