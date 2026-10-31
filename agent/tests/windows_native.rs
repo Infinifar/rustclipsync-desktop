@@ -154,3 +154,39 @@ fn gui_pairing_reads_anonymous_stdin_without_a_console_or_password_arguments() {
     assert!(!String::from_utf8_lossy(&output.stdout).contains(secret));
     assert!(!temp.path().join("RustClipSync/config.json").exists());
 }
+
+#[test]
+fn marked_content_is_excluded_from_optional_encrypted_history() {
+    use rustclipsync_agent::{config::HistorySettings, windows::history::LocalHistory};
+    use rustclipsync_core::adapters::{Direction, HistorySink};
+    let (_temp, root) = root();
+    let path = root.join("history");
+    let key = state::random_key().unwrap();
+    let history = LocalHistory::open(
+        path.clone(),
+        key,
+        HistorySettings {
+            enabled: true,
+            limit: 10,
+            days: 7,
+        },
+    );
+    history
+        .record_marked("sensitive fixture", Direction::Download, 1, true)
+        .unwrap();
+    assert!(!path.exists());
+    assert!(history.data().unwrap().entries.is_empty());
+    history
+        .record("normal fixture", Direction::Upload, 1)
+        .unwrap();
+    let encrypted = storage::read_private(&path, 1024 * 1024).unwrap().unwrap();
+    assert!(!encrypted.windows(14).any(|s| s == b"normal fixture"));
+    let reopened = LocalHistory::open(path.clone(), key, HistorySettings::default());
+    assert_eq!(reopened.data().unwrap().entries.len(), 1);
+    reopened
+        .record("not retained", Direction::Download, 2)
+        .unwrap();
+    assert_eq!(reopened.data().unwrap().entries.len(), 1);
+    reopened.clear().unwrap();
+    assert!(!path.exists());
+}

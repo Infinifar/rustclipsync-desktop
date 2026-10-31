@@ -27,7 +27,7 @@
        <StackPanel Spacing="8">
         <TextBlock x:Name="StateText" Text="后台未启动" FontSize="20" FontWeight="SemiBold" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" AutomationProperties.AutomationId="SyncState"/>
         <TextBlock x:Name="ServerText" Text="服务端：尚未配置" Style="{StaticResource Note}" TextTrimming="CharacterEllipsis"/>
-        <TextBlock x:Name="DeviceText" Text="设备：尚未配对" Style="{StaticResource Note}"/>
+        <TextBlock x:Name="DeviceText" IsTextSelectionEnabled="True" Text="设备：尚未配对" Style="{StaticResource Note}"/>
         <TextBlock x:Name="LastSyncText" Text="最近同步：本次运行尚未同步" Style="{StaticResource Note}"/>
         <TextBlock x:Name="PendingText" Text="有待发送或待确认的内容" Style="{StaticResource Note}" Visibility="Collapsed"/>
        </StackPanel>
@@ -72,7 +72,7 @@
          <StackPanel Orientation="Horizontal" Spacing="10"><Button x:Name="PreviousHistory" Content="上一页" Click="PreviousHistory_Click"/><Button x:Name="NextHistory" Content="下一页" Click="NextHistory_Click"/><Button Content="清空历史" Click="ClearHistory_Click"/><TextBlock x:Name="HistoryCount" VerticalAlignment="Center"/></StackPanel>
         </StackPanel>
        </Expander>
-       <TextBlock Text="关闭窗口后同步会继续运行。双击托盘图标可再次打开，托盘菜单可暂停或退出。" Style="{StaticResource Note}"/>
+       <TextBlock Text="已启动的同步会在关闭窗口后继续运行。双击托盘图标可再次打开，托盘菜单可暂停或退出。" Style="{StaticResource Note}"/>
       </StackPanel>
       <StackPanel x:Name="AppearancePage" Visibility="Collapsed" Spacing="20">
        <TextBlock Text="外观" Style="{StaticResource SectionTitle}"/>
@@ -86,7 +86,7 @@
        <TextBlock Text="设置" Style="{StaticResource SectionTitle}"/>
        <Expander Header="开机自启与后台" IsExpanded="True" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" AutomationProperties.AutomationId="StartupSection">
         <StackPanel Spacing="12"><ToggleSwitch x:Name="StartupToggle" Header="登录 Windows 后自动启动同步" OnContent="开启" OffContent="关闭" Toggled="Startup_Toggled" AutomationProperties.AutomationId="StartAtLogin"/>
-         <TextBlock Text="在当前用户登录后启动同步，不弹出主窗口。关闭此选项不会停止本次正在运行的同步。" Style="{StaticResource Note}"/>
+         <TextBlock Text="在当前用户登录后启动后台，不弹出主窗口，并保留暂停状态。关闭此选项不会停止本次正在运行的同步。" Style="{StaticResource Note}"/>
          <TextBlock x:Name="StartupState" Style="{StaticResource Note}" AutomationProperties.AutomationId="StartupState"/>
          <Button Content="打开 Windows 启动应用设置" Click="WindowsStartup_Click"/>
          <TextBlock Text="Windows 的启动应用设置和组织策略可能限制自启权限。" Style="{StaticResource Note}"/>
@@ -109,20 +109,20 @@
          <TextBox x:Name="FilterTestText" Header="测试文本" MaxLength="8192"/><Button Content="测试过滤规则" Click="TestFilter_Click"/><TextBlock x:Name="FilterTestResult" Style="{StaticResource Note}"/>
         </StackPanel>
        </Expander>
-       <Expander Header="历史记录与清理" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
-        <StackPanel Spacing="14"><ToggleSwitch x:Name="HistoryToggle" Header="保存剪贴板历史" OnContent="开启" OffContent="关闭"/>
+       <Expander AutomationProperties.AutomationId="HistorySettingsSection" Header="历史记录与清理" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+        <StackPanel Spacing="14"><ToggleSwitch x:Name="HistoryToggle" AutomationProperties.AutomationId="HistoryEnabled" Header="保存剪贴板历史" OnContent="开启" OffContent="关闭"/>
          <TextBlock Text="默认关闭。开启后在本机加密保存；关闭后停止新增，已有记录仍按期限清理。敏感文本不会进入普通历史列表。" Style="{StaticResource Note}"/>
          <NumberBox x:Name="HistoryLimitBox" Header="普通历史条数上限" Minimum="1" Maximum="1000" Value="50" SpinButtonPlacementMode="Compact"/>
-         <NumberBox x:Name="HistoryDaysBox" Header="保留天数" Minimum="1" Maximum="365" Value="7" SpinButtonPlacementMode="Compact"/>
+         <NumberBox x:Name="HistoryDaysBox" AutomationProperties.AutomationId="HistoryDays" Header="保留天数" Minimum="1" Maximum="365" Value="7" SpinButtonPlacementMode="Compact"/>
          <TextBlock Text="默认保留 7 天，自动清理过期记录。收藏最多 50 条，保留至手动删除；敏感收件项按保留天数清理。单条历史最多 1 MiB，总正文最多 16 MiB，超限不影响文本同步。" Style="{StaticResource Note}"/>
          <Button Content="清空本地历史" Click="ClearHistory_Click"/>
         </StackPanel>
        </Expander>
-       <StackPanel Orientation="Horizontal" Spacing="10"><Button x:Name="SaveSettingsButton" Content="保存同步设置" Style="{ThemeResource AccentButtonStyle}" Click="SaveSettings_Click" AutomationProperties.AutomationId="SaveSyncSettings"/><Button Content="重新载入" Click="ReloadSettings_Click"/></StackPanel>
+       <StackPanel Orientation="Horizontal" Spacing="10"><Button x:Name="SaveSettingsButton" Content="保存同步设置" Style="{ThemeResource AccentButtonStyle}" Click="SaveSettings_Click" AutomationProperties.AutomationId="SaveSyncSettings"/><Button AutomationProperties.AutomationId="ReloadSettings" Content="重新载入" Click="ReloadSettings_Click"/></StackPanel>
        <Expander Header="关于与诊断" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
         <StackPanel Spacing="12"><TextBlock Text="RustClipSync 0.2.0" FontWeight="SemiBold"/><TextBlock Text="与 Android 输入法和 Omaclipsync 使用同一同步协议。界面关闭后，后台同步独立运行。" Style="{StaticResource Note}"/>
          <StackPanel Orientation="Horizontal" Spacing="8"><HyperlinkButton Content="服务端" NavigateUri="https://github.com/Infinifar/rustclipsync-server"/><HyperlinkButton Content="Android 输入法" NavigateUri="https://github.com/Infinifar/fcitx5-android-bibi-keyboard"/><HyperlinkButton Content="Omaclipsync" NavigateUri="https://github.com/Infinifar/omaclipsync"/></StackPanel>
-         <Button Content="导出脱敏诊断" Click="Diagnostics_Click"/><TextBlock x:Name="DiagnosticsResult" Style="{StaticResource Note}"/>
+         <Button Content="导出脱敏诊断" Click="Diagnostics_Click"/><TextBlock x:Name="DiagnosticsResult" IsTextSelectionEnabled="True" Style="{StaticResource Note}"/>
         </StackPanel>
        </Expander>
       </StackPanel>

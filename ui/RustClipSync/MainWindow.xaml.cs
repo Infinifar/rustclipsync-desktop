@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -28,6 +29,7 @@ public sealed partial class MainWindow : Window
         try { appearance = AppearanceSettings.Load(); } catch { Show("外观设置无法读取", "暂时采用系统主题。可以在外观页重新保存。", InfoBarSeverity.Warning); }
         ThemeChoice.SelectedIndex = appearance.Theme == "dark" ? 2 : appearance.Theme == "light" ? 1 : 0;
         FontChoice.SelectedIndex = appearance.FontSize == 18 ? 2 : appearance.FontSize == 16 ? 1 : 0;
+        Root.ActualThemeChanged += (_, _) => ApplyCaptionTheme();
         ApplyAppearance();
         ReadConfig(); LoadForm(); ReadStartup(); Navigation.SelectedItem = HomeNav;
         Root.Loaded += async (_, _) =>
@@ -81,6 +83,7 @@ public sealed partial class MainWindow : Window
         AppearancePage.Visibility = page == "appearance" ? Visibility.Visible : Visibility.Collapsed;
         SettingsPage.Visibility = page == "settings" ? Visibility.Visible : Visibility.Collapsed;
         if (page == "settings" && initialized) { LoadForm(); ReadStartup(); }
+        if (page != "settings") PasswordBox.Password = "";
     }
     private void OpenSettings_Click(object sender, RoutedEventArgs e) => Navigation.SelectedItem = SettingsNav;
     private void ReadConfig()
@@ -237,7 +240,14 @@ public sealed partial class MainWindow : Window
     {
         Root.RequestedTheme = appearance.Theme == "dark" ? ElementTheme.Dark : appearance.Theme == "light" ? ElementTheme.Light : ElementTheme.Default;
         Navigation.FontSize = appearance.FontSize; Root.Resources["ControlContentThemeFontSize"] = (double)appearance.FontSize;
+        ApplyCaptionTheme();
     }
+    private void ApplyCaptionTheme()
+    {
+        var dark = Root.ActualTheme == ElementTheme.Dark ? 1 : 0;
+        DwmSetWindowAttribute(WinRT.Interop.WindowNative.GetWindowHandle(this), 20, ref dark, sizeof(int));
+    }
+    [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
     private void Appearance_Changed(object sender, SelectionChangedEventArgs e)
     {
         if (!initialized || updating) return;
@@ -282,7 +292,12 @@ public sealed partial class MainWindow : Window
         if (busy || !await Confirm("清空本地历史？", "将删除本机全部普通历史和收藏。不会清空系统剪贴板、敏感收件区、同步游标或设备身份。", "清空历史")) return;
         await Action("clearHistory"); historyOffset = 0; await LoadHistory();
     }
-    private async void CopyInbox_Click(object sender, RoutedEventArgs e) { if (busy || inboxId is null || !await Confirm("复制敏感文本？", "此操作会将敏感文本写入系统剪贴板，其他应用可以读取。会附带敏感标记，请求排除 Windows 剪贴板历史和云同步。", "复制")) return; await Action("copyInbox", new { id = inboxId }); }
+    private async void CopyInbox_Click(object sender, RoutedEventArgs e)
+    {
+        var id = inboxId;
+        if (busy || id is null || !await Confirm("复制敏感文本？", "此操作会将敏感文本写入系统剪贴板，其他应用可以读取。会附带敏感标记，请求排除 Windows 剪贴板历史和云同步。", "复制")) return;
+        await Action("copyInbox", new { id });
+    }
     private async void ClearInbox_Click(object sender, RoutedEventArgs e) { if (!busy && inboxId is not null) await Action("clearInbox", new { id = inboxId }); }
     private async void Diagnostics_Click(object sender, RoutedEventArgs e)
     {

@@ -26,6 +26,8 @@ pub struct HistoryData {
 impl HistoryData {
     pub fn validate(&self) -> io::Result<()> {
         if self.entries.len() > 1050
+            || self.entries.iter().filter(|e| e.favorite).count() > 50
+            || self.entries.iter().map(|e| e.text.len()).sum::<usize>() > MAX_TOTAL
             || self.entries.iter().any(|v| {
                 v.text.len() > MAX_TEXT
                     || v.id.len() != 36
@@ -120,7 +122,7 @@ impl HistoryData {
     }
 }
 fn key(key: &[u8; 32]) -> io::Result<aead::LessSafeKey> {
-    let mut material = Vec::from(key.as_slice());
+    let mut material = zeroize::Zeroizing::new(Vec::from(key.as_slice()));
     material.extend_from_slice(b"RustClipSync history");
     let derived = digest::digest(&digest::SHA256, &material);
     Ok(aead::LessSafeKey::new(

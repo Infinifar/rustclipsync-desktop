@@ -163,13 +163,13 @@ unsafe extern "system" fn procedure(
                 MF_STRING,
                 PAUSE,
                 wide(if paused {
-                    "Resume synchronization"
+                    "恢复同步"
                 } else {
-                    "Pause synchronization"
+                    "暂停同步"
                 })
                 .as_ptr(),
             );
-            AppendMenuW(menu, MF_STRING, QUIT, wide("Exit RustClipSync").as_ptr());
+            AppendMenuW(menu, MF_STRING, QUIT, wide("退出 RustClipSync").as_ptr());
             let mut point = mem::zeroed();
             GetCursorPos(&mut point);
             SetForegroundWindow(hwnd);

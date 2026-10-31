@@ -31,7 +31,7 @@ internal sealed class AppearanceSettings
 }
 internal static class StartupSettings
 {
-    private static string ShortcutPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Startup), "RustClipSync.lnk");
+    private static string ShortcutPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Startup, Environment.SpecialFolderOption.Create), "RustClipSync.lnk");
     internal static bool Enabled()
     {
         if (!File.Exists(ShortcutPath)) return false;

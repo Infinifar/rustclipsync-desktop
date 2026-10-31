@@ -70,6 +70,7 @@ public static class ScreenSize { [DllImport("user32.dll")] public static extern 
     . "$PSScriptRoot/test-windows-ui.ps1"
     $ui.CloseMainWindow() | Out-Null
     if (!$ui.WaitForExit(10000)) { throw 'WinUI did not close cleanly' }
+    . "$PSScriptRoot/test-windows-paired-ui.ps1"
 } finally {
     $env:LOCALAPPDATA = $originalData
 }

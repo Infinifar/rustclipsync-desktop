@@ -285,6 +285,25 @@ pub fn call(bytes: &[u8]) -> io::Result<serde_json::Value> {
             ptr::null_mut(),
         ))?
     };
+    unsafe {
+        let mut pid = 0;
+        let mut session = 0;
+        if GetNamedPipeServerProcessId(pipe.0, &mut pid) == 0
+            || ProcessIdToSessionId(pid, &mut session) == 0
+            || session_id()? != session
+        {
+            return Err(io::Error::other("invalid control peer"));
+        }
+        let process = Handle::new(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid))?;
+        let mut path = vec![0u16; 32768];
+        let mut size = path.len() as u32;
+        if QueryFullProcessImageNameW(process.0, 0, path.as_mut_ptr(), &mut size) == 0
+            || !String::from_utf16_lossy(&path[..size as usize])
+                .eq_ignore_ascii_case(&std::env::current_exe()?.to_string_lossy())
+        {
+            return Err(io::Error::other("invalid control peer"));
+        }
+    }
     let mut header = (bytes.len() as u32).to_le_bytes();
     let mut body = bytes.to_vec();
     transfer(pipe.0, &mut header, true, &control)?;
