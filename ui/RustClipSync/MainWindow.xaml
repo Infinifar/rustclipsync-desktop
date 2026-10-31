@@ -102,7 +102,7 @@
        <Expander x:Name="PrivacySettingsSection" AutomationProperties.AutomationId="PrivacySettingsSection" Header="同步与隐私" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
         <StackPanel Spacing="14"><ToggleSwitch x:Name="SensitiveToggle" Header="同步已标记的敏感文本" OnContent="开启" OffContent="关闭" Toggled="SensitiveToggle_Toggled" AutomationProperties.AutomationId="AllowSensitive"/>
          <TextBlock Text="默认关闭。部分应用可能不标记敏感内容，因此不能识别所有敏感信息。" Style="{StaticResource Note}"/>
-         <ToggleSwitch x:Name="AutoSensitiveToggle" Header="自动将收到的敏感文本写入系统剪贴板" OnContent="开启" OffContent="关闭" IsEnabled="False" AutomationProperties.AutomationId="AutoApplySensitive"/>
+         <ToggleSwitch x:Name="AutoSensitiveToggle" OnContent="开启" OffContent="关闭" IsEnabled="False" AutomationProperties.AutomationId="AutoApplySensitive" AutomationProperties.Name="自动将收到的敏感文本写入系统剪贴板"><ToggleSwitch.Header><TextBlock Text="自动将收到的敏感文本写入系统剪贴板" TextWrapping="Wrap"/></ToggleSwitch.Header></ToggleSwitch>
          <TextBlock Text="默认关闭，仅存入加密收件区。开启敏感同步后可启用自动写入，并保存同步设置；只影响之后收到的内容，已有收件项不会补写。自动写入不保存到应用普通历史，并请求 Windows 排除剪贴板历史和云同步；其他应用仍能读取当前剪贴板。" Style="{StaticResource Note}"/>
          <NumberBox x:Name="IntervalBox" Header="备用检查间隔（秒）" Minimum="30" Maximum="300" SpinButtonPlacementMode="Compact" Value="60"/>
          <TextBlock Text="正常连接时使用实时通知，此间隔用于备用检查。" Style="{StaticResource Note}"/>

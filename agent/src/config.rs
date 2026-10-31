@@ -177,6 +177,13 @@ mod tests {
         assert!(!c.auto_apply_sensitive);
         assert!(!c.history.enabled);
         assert_eq!(c.history.days, 7);
+        let c: Config = serde_json::from_str(
+            r#"{"server":"https://example.test/","user":"user","allowSensitive":true}"#,
+        )
+        .unwrap();
+        assert!(c.allow_sensitive);
+        assert!(!c.auto_apply_sensitive);
+        assert!(!c.applies_sensitive());
     }
     #[test]
     fn automatic_sensitive_clipboard_requires_both_opt_ins() {
