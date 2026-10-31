@@ -1,0 +1,22 @@
+[Desktop Entry]
+Type=Application
+Name=RustClipSync
+Comment=Private text clipboard synchronization
+Comment[zh_CN]=轻量文本剪贴板同步
+Exec=rustclipsync
+Icon=io.github.infinifar.rustclipsync
+Terminal=false
+Categories=Utility;Network;
+Keywords=clipboard;sync;
+StartupWMClass=rustclipsync
+Actions=History;Inbox;
+
+[Desktop Action History]
+Name=History
+Name[zh_CN]=历史记录
+Exec=rustclipsync --history
+
+[Desktop Action Inbox]
+Name=Sensitive inbox
+Name[zh_CN]=敏感收件区
+Exec=rustclipsync --inbox

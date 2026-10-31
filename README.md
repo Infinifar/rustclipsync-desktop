@@ -2,7 +2,9 @@
 
 # RustClipSync Desktop
 
-Windows 11 原生剪贴板同步客户端，使用 **WinUI 3 / C# / XAML 界面与 Rust 常驻后台**。关闭窗口后，已启动的同步继续运行；双击托盘图标可重新打开。
+Windows 11 与 Linux 桌面剪贴板同步客户端，共用 Rust 后台及 [rustclipsync-core](https://github.com/Infinifar/rustclipsync-core)。Windows 使用 **WinUI 3 / C# / XAML**，Linux 使用 **Qt 6/QML** 独立界面。关闭界面后，已启动的 Rust 后台继续同步。
+
+Linux 的支持范围、编译、安装包和快捷键配置见 [Linux 使用说明](LINUX.md)。Windows 的原生界面、托盘、自启和全局快捷键保留。
 
 ## 页面与功能
 

@@ -29,11 +29,15 @@ fn main() {
         std::process::exit(1);
     }
 }
-#[cfg(not(any(windows, feature = "check-windows")))]
+#[cfg(all(target_os = "linux", not(feature = "check-windows")))]
+fn entry() -> io::Result<()> {
+    rustclipsync_agent::linux::host::entry()
+}
+#[cfg(not(any(windows, target_os = "linux", feature = "check-windows")))]
 fn entry() -> io::Result<()> {
     Err(io::Error::new(
         io::ErrorKind::Unsupported,
-        "the agent requires Windows 11",
+        "the agent requires Windows or Linux",
     ))
 }
 #[cfg(any(windows, feature = "check-windows"))]

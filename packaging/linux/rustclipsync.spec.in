@@ -1,0 +1,21 @@
+Name: rustclipsync-desktop
+Version: @VERSION@
+Release: 1%{?dist}
+Summary: RustClipSync native Qt 6 and Rust clipboard client
+License: MIT
+URL: https://github.com/Infinifar/rustclipsync-desktop
+Requires: qt6-qtbase-gui, qt6-qtdeclarative, qt6-qtwayland, dbus-libs
+Recommends: gnome-keyring
+%global debug_package %{nil}
+%description
+Lightweight Rust clipboard synchronization with a Qt 6/QML interface.
+An unlocked Secret Service provider is required for encrypted state storage.
+%install
+mkdir -p %{buildroot}
+cp -a @STAGE@/. %{buildroot}/
+%files
+%{_bindir}/rustclipsync
+/usr/libexec/rustclipsync/rustclipsync-agent
+%{_datadir}/applications/io.github.infinifar.rustclipsync.desktop
+%{_datadir}/icons/hicolor/256x256/apps/io.github.infinifar.rustclipsync.png
+%license %{_datadir}/licenses/rustclipsync-desktop/LICENSE

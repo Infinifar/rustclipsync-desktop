@@ -39,3 +39,6 @@ impl Drop for Handle {
 
 pub mod history;
 pub mod pipe;
+
+pub mod signals;
+pub use signals::{bind_shortcuts, notify, Notification, Signals};

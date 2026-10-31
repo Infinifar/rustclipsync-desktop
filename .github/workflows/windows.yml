@@ -75,6 +75,8 @@ jobs:
         run: |
           rustup toolchain install 1.99.1 --profile minimal --component clippy,rustfmt
           rustup override set 1.99.1
+      - name: Install Linux Secret Service build dependency
+        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
       - run: python3 scripts/verify-core.py
       - run: cargo test --locked
       - run: cargo clippy --locked --features check-windows --all-targets -- -D warnings

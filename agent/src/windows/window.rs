@@ -65,7 +65,11 @@ impl Window {
             if hwnd.is_null() {
                 return Err(io::Error::last_os_error());
             }
-            context.control.hwnd.store(hwnd as usize, Ordering::SeqCst);
+            context
+                .control
+                .signals
+                .hwnd
+                .store(hwnd as usize, Ordering::SeqCst);
             let binding_failed = context
                 .hotkeys
                 .borrow_mut()
@@ -150,6 +154,7 @@ unsafe extern "system" fn procedure(
     match message {
         UPDATE_SHORTCUTS => {
             let request = control
+                .signals
                 .shortcut_request
                 .lock()
                 .ok()

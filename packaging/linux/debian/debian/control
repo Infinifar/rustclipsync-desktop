@@ -1,0 +1,10 @@
+Source: rustclipsync-desktop
+Section: utils
+Priority: optional
+Maintainer: Infinifar <infinifar@users.noreply.github.com>
+Standards-Version: 4.6.2
+
+Package: rustclipsync-desktop
+Architecture: any
+Description: RustClipSync native Linux desktop client
+ Shared Rust synchronization engine and Qt 6/QML user interface.

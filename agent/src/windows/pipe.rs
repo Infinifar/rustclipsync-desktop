@@ -256,7 +256,7 @@ fn handle(pipe: HANDLE, control: &Arc<Control>) -> io::Result<()> {
     if quit {
         unsafe {
             windows_sys::Win32::UI::WindowsAndMessaging::PostMessageW(
-                control.hwnd.load(Ordering::SeqCst) as _,
+                control.signals.hwnd.load(Ordering::SeqCst) as _,
                 windows_sys::Win32::UI::WindowsAndMessaging::WM_CLOSE,
                 0,
                 0,

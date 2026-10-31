@@ -108,3 +108,7 @@ CI 另外执行实际安装、WinUI 三页、主题/字号持久化、真实自�
 共享源码快照由 `scripts/sync-core.sh` 从独立项目导出。不要手工编辑 vendor；校验器在独立检出中验证全部导出文件的 SHA-256。
 
 全局快捷键由 Rust 隐藏窗口持有，支持后台独立运行时唤起界面。失败保留旧绑定；退出后台释放。详细字段及错误见 [IPC.md](../IPC.md)。
+
+## Linux desktop host
+
+The same agent now selects platform adapters at compile time. Shared orchestration is in `src/runtime.rs`, encrypted history in `src/local_history.rs`, and Linux desktop integration in `src/linux/`. `rustclipsync-core` remains unchanged. See [Linux usage and build instructions](../LINUX.md).

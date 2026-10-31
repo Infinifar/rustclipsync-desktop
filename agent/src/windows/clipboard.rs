@@ -315,3 +315,6 @@ impl Drop for Allocation {
         }
     }
 }
+
+/// Desktop runtime platform selection.
+pub type PlatformClipboard = WindowsClipboard;
