@@ -10,7 +10,7 @@ public sealed partial class MainWindow : Window
     private string? savedServer;
     private string? savedUser;
     private static string AgentPath => Path.Combine(AppContext.BaseDirectory, "rustclipsync-agent.exe");
-    private static string ConfigPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RustClipSync", "config.json");
+    private static string ConfigPath => Path.Combine(Environment.GetEnvironmentVariable("LOCALAPPDATA") ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RustClipSync", "config.json");
     public MainWindow()
     {
         InitializeComponent();
@@ -49,26 +49,27 @@ public sealed partial class MainWindow : Window
     {
         Notice.Title = title; Notice.Message = message; Notice.Severity = severity; Notice.IsOpen = true;
     }
-    private static bool SameServer(string a, string b) => Uri.TryCreate(a, UriKind.Absolute, out var x) && Uri.TryCreate(b, UriKind.Absolute, out var y) && x.AbsoluteUri.TrimEnd('/') == y.AbsoluteUri.TrimEnd('/');
+    private static bool SameServer(string a, string b) => Uri.TryCreate(a, UriKind.Absolute, out var x) && Uri.TryCreate(b, UriKind.Absolute, out var y) && WithSlash(x.AbsoluteUri) == WithSlash(y.AbsoluteUri);
+    private static string WithSlash(string uri) => uri.EndsWith('/') ? uri : uri + "/";
     private async void Connect_Click(object sender, RoutedEventArgs e)
     {
         if (Busy.IsActive) return;
         SetBusy(true);
         try
         {
-        var server = ServerBox.Text.Trim();
-        var user = UserBox.Text;
-        if (!Uri.TryCreate(server, UriKind.Absolute, out var uri) || uri.Scheme != "https" || !string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment) || string.IsNullOrWhiteSpace(user))
-        { Show("检查连接信息", "请填写 HTTPS 服务端根地址和账户。", InfoBarSeverity.Warning); return; }
-        if (savedServer is not null && SameServer(server, savedServer) && user == savedUser && PasswordBox.Password.Length == 0)
-        { StartAgent(); return; }
-        if (PasswordBox.Password.Length == 0) { Show("需要密码", "请输入该服务端账户的密码以完成配对。", InfoBarSeverity.Warning); return; }
-        var reset = File.Exists(ConfigPath);
-        if (reset)
-        {
-            var dialog = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "重新配对此设备？", Content = "这会放弃尚未发送的本地内容，并重新建立设备身份。旧服务端设备记录可以在服务端管理页面删除。", PrimaryButtonText = "重新配对", CloseButtonText = "取消", DefaultButton = ContentDialogButton.Close };
-            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
-        }
+            var server = ServerBox.Text.Trim();
+            var user = UserBox.Text;
+            if (!Uri.TryCreate(server, UriKind.Absolute, out var uri) || uri.Scheme != "https" || !string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment) || string.IsNullOrWhiteSpace(user))
+            { Show("检查连接信息", "请填写 HTTPS 服务端根地址和账户。", InfoBarSeverity.Warning); return; }
+            if (savedServer is not null && SameServer(server, savedServer) && user == savedUser && PasswordBox.Password.Length == 0)
+            { StartAgent(); return; }
+            if (PasswordBox.Password.Length == 0) { Show("需要密码", "请输入该服务端账户的密码以完成配对。", InfoBarSeverity.Warning); return; }
+            var reset = File.Exists(ConfigPath);
+            if (reset)
+            {
+                var dialog = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "重新配对此设备？", Content = "这会放弃尚未发送的本地内容，并重新建立设备身份。旧服务端设备记录可以在服务端管理页面删除。", PrimaryButtonText = "重新配对", CloseButtonText = "取消", DefaultButton = ContentDialogButton.Close };
+                if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+            }
             if (!await StopAgentAsync()) { Show("后台仍在退出", "请稍后重试，或从系统托盘退出 RustClipSync。", InfoBarSeverity.Warning); return; }
             var start = new ProcessStartInfo(AgentPath) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true };
             foreach (var arg in new[] { "pair", server, user, "--password-stdin" }) start.ArgumentList.Add(arg);

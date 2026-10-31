@@ -1,6 +1,6 @@
 # Windows 客户端设计
 
-状态：设计已选定；共享 Rust 核心已在本机抽取并接入 Omaclipsync，Windows Rust 后台与平台适配已有源码实现，WinUI 页面尚未实现；验证范围见 VALIDATION.md。
+状态：设计已选定；共享 Rust 核心已在本机抽取并接入 Omaclipsync，Windows Rust 后台与平台适配已有源码实现，已增加 WinUI 首次配置窗口与按用户安装器，完整四页界面及 Named Pipe 待实现；验证范围见 VALIDATION.md。
 
 ## 目标与技术选择
 
@@ -8,7 +8,7 @@
 
 UI 使用 WinUI 3、C# 和 XAML。它提供原生 Fluent 控件，适合设置、列表、系统主题与无障碍交互。Windows App SDK 和 .NET 的具体受支持版本在实现时锁定，不在设计阶段猜测版本或内存收益。[微软 WinUI 文档](https://learn.microsoft.com/en-us/windows/apps/winui/winui3/)
 
-Rust 负责同步和系统交互，通过 Microsoft windows-rs 的低层 `windows-sys` 绑定调用 Win32。UI 不承载常驻同步状态，也不直接调用服务端。先使用两个进程和 Named Pipe，避免把 C ABI、Rust 生命周期及 .NET 常驻内存耦合在一起。NativeAOT 属于后续可测量的优化，不是首发前提。
+Rust 负责同步和系统交互，通过 Microsoft windows-rs 的低层 `windows-sys` 绑定调用 Win32。UI 不承载常驻同步状态，也不直接调用服务端。采用两个进程；首次配对通过专属子进程的匿名 stdin 管道传递密码，其余控制暂用经过进程路径/会话核对的 Windows 消息，后续按 IPC.md 接入完整 Named Pipe。避免把 Rust 生命周期及 .NET 常驻内存耦合在一起。当前首次配置窗口使用 .NET 10 / Windows App SDK 2.6.4，自包含发布；NativeAOT 属于后续可测量的优化，不是首发前提。
 
 ## 进程与模块
 
@@ -122,3 +122,9 @@ DPAPI 不防同一用户权限的恶意软件。TLS 保护传输，服务端依�
 性能验收分开测 agent 空闲、UI 打开、关闭 UI 后、网络失败、长文本峰值与长时间运行。只在 Windows 实机或虚拟机上给出数值，不把 Linux 二进制大小或内存数据当作 Windows 结果。主要优化来自 UI 按需退出、事件驱动、有界队列和文本副本限制。
 
 参考实现入口：[Microsoft windows-rs](https://github.com/microsoft/windows-rs)。上述进程和模块划分是本项目设计决策，不是微软对该应用资源用量的保证。
+
+## 当前安装路线
+
+为让未配置运行时的 Windows 11 电脑能够直接安装，当前选择按用户的 Inno Setup EXE 安装包，内含 WinUI/.NET 与应用本地 C++ 运行库，并提供开始菜单入口与卸载程序。暂不要求用户信任自签名 MSIX 证书。安装器有可选的桌面与登录启动项，使用 `PrivilegesRequired=lowest`，升级/卸载先请求 Rust 后台正常退出。完整 MSIX 方案后续再评估。
+
+图标源文件 `assets/omaclipsync.svg` 逐字复用 Omaclipsync MIT 资源；PNG 与包含 16–256 像素尺寸的 ICO 是该 SVG 的格式导出，没有重新绘制图案。

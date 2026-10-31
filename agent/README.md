@@ -1,6 +1,6 @@
 # Windows Rust 后台
 
-`rustclipsync-agent` 是普通用户会话进程，复用 `rustclipsync-core`。当前可独立配对、运行同步并通过系统托盘暂停/退出，WinUI 与 Named Pipe 尚未接入。
+`rustclipsync-agent` 是普通用户会话进程，复用 `rustclipsync-core`。当前可独立配对、运行同步并通过系统托盘暂停/退出。已接入 WinUI 首次配置窗口与安装器；完整 Named Pipe 控制协议仍待后续实现。
 
 ## 已实现
 
@@ -33,7 +33,7 @@ Start-Process -FilePath .\target\release\rustclipsync-agent.exe -ArgumentList 'r
 
 配对通过控制台隐藏输入密码，不支持密码命令行参数或明文配置。配对结束后该进程退出；日常 `run` 使用设备 token，不保留注册时的账户密码。输入缓冲尽力清理，但不承诺所有库/系统内存中的临时副本即时清零。
 
-系统托盘右键可暂停、恢复、退出。悬停显示 `connected`、`offline`、`paused`、`conflict`、`re_pair`、`credentials` 或 `storage_error` 等固定状态。暂停期间不补传复制内容；恢复后监听新的复制。网络中断期间仍保留最后一条本地待发送内容。
+系统托盘采用 Omaclipsync 同款图标，双击或右键“打开 RustClipSync”可打开配置窗口；右键还可暂停、恢复、退出。悬停显示 `connected`、`offline`、`paused`、`conflict`、`re_pair`、`credentials` 或 `storage_error` 等固定状态。暂停期间不补传复制内容；恢复后监听新的复制。网络中断期间仍保留最后一条本地待发送内容。
 
 已有配置需要重配时，先从托盘退出，再显式使用 `pair ... --reset`。该操作会重建设备身份并放弃当前身份的待发送内容；不会自动撤销服务端的旧设备，需在服务端管理界面删除。配置其他服务器/账户时使用不同的本地加密状态文件，旧文件不会自动删除。
 
@@ -78,3 +78,9 @@ cargo test --locked --test windows_clipboard -- --ignored --test-threads=1
 这项测试会覆盖测试会话剪贴板，不应在日常桌面运行。Windows CI 会在一次性的 GitHub 托管 runner 中显式执行它；日常电脑仍默认忽略。当前本机验证结果及待验收项见 [VALIDATION.md](../VALIDATION.md)。
 
 共享核心源码快照由 `bash scripts/sync-core.sh` 从相邻项目导出；不要直接编辑 `agent/vendor/rustclipsync-core`。`verify-core.py` 可在独立检出中校验全部导出文件的哈希。
+
+## 图形界面与安装器
+
+日常使用请安装 `dist/installer/RustClipSync-0.1.0-setup-x64.exe`，从开始菜单打开 RustClipSync。不要只复制后台 EXE，WinUI 的运行库需要完整目录。无参数双击后台时，若同目录存在 WinUI 程序会打开它；独立后台文件会明确提示其用途，不再静默退出。
+
+WinUI 使用 C#/XAML、.NET 10 和 Windows App SDK 2.6.4，按需启动；注册密码通过专属子进程的匿名 stdin 管道传递，大小限额 8 KiB。普通 `pair` 控制台输入仍可使用。首次配置窗口是当前可用入口，完整历史和设置页面后续补齐。

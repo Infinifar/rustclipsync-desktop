@@ -26,9 +26,10 @@ try {
     for ($i=0; $i -lt 60; $i++) {
         Start-Sleep -Milliseconds 500
         $ui = Get-Process -Name RustClipSync -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq "$destination/RustClipSync.exe" } | Select-Object -First 1
-        if ($ui) { $ui.Refresh(); if ($ui.MainWindowHandle -ne 0) { break } }
+        if ($ui) { $ui.Refresh(); if ($ui.MainWindowHandle -ne 0 -and $ui.MainWindowTitle -eq 'RustClipSync') { break } }
     }
-    if (!$ui -or $ui.MainWindowHandle -eq 0) { throw 'Double-click did not create a visible WinUI window' }
+    if (!$ui -or $ui.MainWindowHandle -eq 0 -or $ui.MainWindowTitle -ne 'RustClipSync') { throw 'Double-click did not create a visible WinUI window' }
+    Start-Sleep -Seconds 2
     Write-Output "WinUI window visible: $($ui.MainWindowTitle)"
     # Record the actual native window on the disposable runner for visual QA.
     Add-Type @'
