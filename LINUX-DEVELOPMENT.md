@@ -3,17 +3,17 @@
 The existing `rustclipsync-core` source snapshot remains the protocol authority.
 This work changes the desktop host, not the server protocol or shared core.
 
-## Implementation order
+## Completed implementation
 
-1. Move session orchestration and encrypted local history into shared agent modules.
-   Keep Windows messages, DPAPI, ACLs, clipboard, tray and hotkeys in `windows/`.
-2. Add a Linux host: private XDG storage, Secret Service key storage, bounded local
+1. Session orchestration and encrypted local history live in shared agent modules.
+   Windows messages, DPAPI, ACLs, clipboard, tray and hotkeys remain in `windows/`.
+2. The Linux host provides private XDG storage, Secret Service key storage, bounded local
    Unix-socket IPC, regular Wayland/X11 clipboard access and desktop activation.
-3. Add an independent Qt 6/QML interface, using the existing desktop composition:
+3. An independent Qt 6/QML interface follows the existing desktop composition:
    centered Home/Appearance/Shortcuts/Settings navigation, sync controls, an always
    visible masked sensitive inbox, and searchable encrypted history. Qt is a thin
    presentation host; network requests and state transitions stay in Rust.
-4. Add reproducible native DEB/RPM/Arch packaging and a Linux CI matrix, keeping
+4. Native DEB/RPM/Arch packaging and a Linux CI matrix keep
    the existing native Windows build, clipboard, IPC and WinUI installation tests.
 
 ## Verification boundaries
@@ -37,3 +37,5 @@ reference, not assets to ship. Use the existing logo, real controls, clear empty
 states, one scroll owner per page, and no sensitive text in status/notifications.
 Verify a normal desktop window and a narrow window, light/dark themes and the
 separate masked inbox window. No pixel-identical claim across UI toolkits.
+
+Final checks and platform limitations are recorded in [VALIDATION.md](VALIDATION.md).

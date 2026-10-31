@@ -1,3 +1,66 @@
+# Linux 桌面适配与 Windows 回归验证
+
+日期：2026-10-31。受测代码提交：`efc586b6352c006b95449464e1ac77678dea8cee`。
+本轮复用既有共享核心，快照 SHA-256 校验通过；未修改服务端、Android 或 Omaclipsync。
+
+## 构建和安装
+
+[Linux CI 41230626304](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41230626304)
+五项作业全部通过，覆盖 Debian 12、Ubuntu 24.04、Fedora 43、Arch x86_64。每个发行版执行 Rust
+检查、原生 Qt 构建、隔离剪贴板/密钥环/界面测试、打包、实际安装及安装后的启动检查。
+产物为两个分别标注系统基线的 DEB、一个 RPM 和一个 pacman 安装包，附 SHA256SUMS。
+
+另一个非 root 作业在独立无头 Sway 中验证原生 Wayland 剪贴板与 D-Bus 通知。
+容器中的桌面测试使用普通用户，独立 HOME、所有 XDG 目录、D-Bus 和临时密钥环；
+GNOME Keyring 的 IPC_LOCK 能力只配置在一次性构建容器中。
+
+本地也在临时安装根目录安装了 Arch 包并启动已安装的 Qt 客户端；空数据库测试
+跳过了依赖检查，完整发行版容器中的安装检查不跳过依赖。Arch 元数据必须直接位于
+归档根目录，打包脚本现在额外调用 pacman 校验。包内文件使用 root:root 所有权。
+
+## 实际验证范围
+
+- 普通 Rust 测试：13 项客户端逻辑、5 项 Linux 存储/IPC/历史测试，以及共享快照
+  4 项模块测试；Clippy、格式和共享源码哈希检查通过。
+- 隔离原生测试：Secret Service 随机密钥读写与丢失保护、加密状态和历史、真实
+  Unix socket、设置版本冲突、按 ID 读取/复制/删除敏感收件项及保留接收游标。
+- X11/XFixes 和 Wayland data-control：约 700 KB Unicode 合成文本完整传输、
+  敏感标记、默认拒绝自动敏感写入、显式启用/关闭、来源标记和自身事件过滤。
+- Qt 6.4（Debian 12）与 Qt 6.12（本机 Arch/Omarchy）：实际 QML 启动和界面到
+  Rust 后台集成，主题/字号、配置保存、遮罩/分块预览、独立小窗和置顶标志、
+  历史读取、自启入口建立/删除。480 与 760 宽度检查，实际渲染图已目视检查。
+- 实际启动第二个界面进程并通过激活 socket 触发历史/敏感小窗开关；最后一个
+  快捷键小窗关闭后界面进程正常退出。主窗口走真实关闭路径，之后 Rust 后台
+  仍可响应控制请求。激活有同用户检查、限长和收据，覆盖已有缓冲数据的情况。
+- 新敏感收件通知使用假桌面通知服务验证真实 D-Bus 投递及突发合并，通知参数
+  仅有固定到达提示和应用标识，不含剪贴板正文、账户或设备 ID；启动旧收件项
+  不触发通知。
+
+界面集成使用真实 Qt 对象和 Rust 进程，自动化渲染采用 offscreen/software；
+窗口置顶标志检查不代表所有窗口管理器都会接受置顶请求。会话控制夹具为暂停状态，
+未将测试文本写入用户当前剪贴板，也未连接生产同步服务。
+
+## Windows 功能保留
+
+[Windows CI 41230626313](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41230626313)
+继续执行原生 MSVC 构建、DPAPI/ACL、真实剪贴板、管道、全局快捷键、WinUI
+界面、居中导航、图标、安装与卸载检查，全部通过。Windows 使用原有 WinUI 前端和原生命名
+管道；共用运行逻辑与历史模块通过兼容导出保留原调用路径。
+
+## 当前限制
+
+- Wayland 必须提供所需 data-control 协议；未验收不提供该协议的 GNOME/Wayland
+  集成，也不把 XWayland 当作整个 Wayland 桌面的剪贴板。
+- Linux 快捷键由桌面绑定 `rustclipsync --history` / `rustclipsync --inbox`，当前
+  不提供应用内 GlobalShortcuts Portal 注册。Windows 原有按键注册不受影响。
+- 本轮为 x86_64 原生 DEB/RPM/Arch 包；未提供 ARM64、Flatpak 或 AppImage。
+  系统 Qt 和 glibc 的最低要求以各包的实际构建基线及依赖元数据为准。
+- 本轮未进行不同真实桌面版本的完整矩阵、跨设备长期同步、休眠恢复或新的
+  性能/内存基准，不将安装包大小作为常驻内存指标。
+- Linux 当前构建产物通过 Actions 提供；既有正式 Windows Release 未被替换。
+
+---
+
 # Windows 0.2.3 验证
 
 [CI 41216584020](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41216584020) 在源码提交 `0c3b8954c3d26cc748f26a422e16a48ab374afc0` 上 Windows / Ubuntu 全部通过。
