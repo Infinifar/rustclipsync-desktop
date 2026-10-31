@@ -268,7 +268,7 @@ public sealed partial class MainWindow : Window
     {
         Navigation.SelectedItem = SettingsNav; PrivacySettingsSection.IsExpanded = true;
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => {
-            if (closed || Navigation.SelectedItem != SettingsNav) return;
+            if (closed || !ReferenceEquals(Navigation.SelectedItem, SettingsNav)) return;
             PrivacySettingsSection.UpdateLayout();
             PrivacySettingsSection.StartBringIntoView(new BringIntoViewOptions { AnimationDesired = false, VerticalAlignmentRatio = 0 });
         });
@@ -288,9 +288,6 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception error)
         {
-            // Window construction/presentation only: this block never reads an
-            // inbox body, password or other clipboard content.
-            try { File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "inbox-window-error.log"), error.ToString()); } catch { }
             Show("无法打开敏感收件小窗", $"窗口错误代码：0x{error.HResult:X8}。", InfoBarSeverity.Error);
         }
     }

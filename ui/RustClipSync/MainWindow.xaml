@@ -46,12 +46,11 @@
        </StackPanel>
        <Border x:Name="InboxCard" Visibility="Collapsed" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
         <StackPanel Spacing="10">
-         <TextBlock Text="敏感收件区" Style="{StaticResource SectionTitle}"/>
+         <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="敏感收件区" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"/><HyperlinkButton Grid.Column="1" Content="以小窗显示" Click="OpenInboxWindow_Click" AutomationProperties.AutomationId="OpenSensitiveWindow"/></Grid>
          <TextBlock Text="••••••••" FontSize="24"/>
          <TextBlock x:Name="InboxTime" Style="{StaticResource Note}"/>
          <TextBlock Text="此内容未写入系统剪贴板。关闭历史记录时，仍可使用当前收件项。" Style="{StaticResource Note}"/>
          <StackPanel Orientation="Horizontal" Spacing="10"><Button Content="复制到剪贴板" Click="CopyInbox_Click"/><Button Content="删除" Click="ClearInbox_Click"/></StackPanel>
-         <HyperlinkButton Content="以小窗显示" Click="OpenInboxWindow_Click" AutomationProperties.AutomationId="OpenSensitiveWindow"/>
          <Button Content="自动写入设置" Click="OpenPrivacySettings_Click" AutomationProperties.AutomationId="OpenSensitiveSettings"/>
         </StackPanel>
        </Border>

@@ -18,12 +18,12 @@ $mainHandle = [InspectorWindowTest]::GetAncestor([IntPtr]$mainWindow.Current.Nat
 function Get-InspectorWindows {
     return [System.Windows.Automation.AutomationElement]::RootElement.FindAll([System.Windows.Automation.TreeScope]::Children,[System.Windows.Automation.AndCondition]::new([System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ProcessIdProperty,$ui.Id),[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,'敏感收件区')))
 }
+if ((Get-Control OpenSensitiveWindow).Current.IsOffscreen) { throw 'Sensitive window entry is not visible beside the inbox heading' }
 Invoke-Control OpenSensitiveWindow
 $end = (Get-Date).AddSeconds(15)
 do { $inspectors = @(Get-InspectorWindows); if ($inspectors.Count -eq 1) { break }; Start-Sleep -Milliseconds 100 } while ((Get-Date) -lt $end)
 if ($inspectors.Count -ne 1) {
     Save-Screen 'failed-sensitive-window'
-    if (Test-Path "$destination/inbox-window-error.log") { Get-Content "$destination/inbox-window-error.log"; Copy-Item "$destination/inbox-window-error.log" "$root/dist/installer/inbox-window-error.log" }
     $windows = [System.Windows.Automation.AutomationElement]::RootElement.FindAll([System.Windows.Automation.TreeScope]::Children,[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ProcessIdProperty,$ui.Id))
     foreach ($element in $windows) { Write-Output "Native UI window: $($element.Current.Name) [$($element.Current.NativeWindowHandle)]" }
     throw 'Sensitive inspector did not open'
