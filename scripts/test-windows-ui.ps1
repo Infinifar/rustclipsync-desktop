@@ -56,5 +56,10 @@ Save-Screen 'settings-startup'
 $toggle.Toggle(); Start-Sleep -Milliseconds 400
 if (Test-Path $startup) { throw 'UI did not remove startup shortcut when disabled' }
 Invoke-Control NavHome
+foreach ($id in @('PushNow','PullNow','PauseSync','SyncDirection')) {
+    $bounds = (Get-Control $id).Current.BoundingRectangle
+    $container = $script:window.Current.BoundingRectangle
+    if ($bounds.Right -gt ($container.Right-4) -or $bounds.Left -lt ($container.Left+4)) { throw "Control extends beyond the native window: $id" }
+}
 Save-Screen 'home-dark'
 Write-Output 'PASS: Home/Appearance/Settings navigation, persistent theme/font and actual startup shortcut toggle.'

@@ -36,9 +36,9 @@ foreach ($element in $all) { if ($element.Current.Name -like '*UI private fixtur
 Save-Screen 'paired-home-dark'
 # Appearance JSON from the preceding process must still be selected after reopen.
 Invoke-Control NavAppearance
-$selected = (Get-Control ThemeChoice).GetCurrentPattern([System.Windows.Automation.SelectionPattern]::Pattern).GetCurrentSelection()
+$selected = (Get-Control ThemeChoice).GetCurrentPattern([System.Windows.Automation.SelectionPattern]::Pattern).Current.GetSelection()
 if ($selected.Count -ne 1 -or $selected[0].Current.Name -ne '深色') { throw 'Theme did not survive process exit' }
-$selected = (Get-Control FontChoice).GetCurrentPattern([System.Windows.Automation.SelectionPattern]::Pattern).GetCurrentSelection()
+$selected = (Get-Control FontChoice).GetCurrentPattern([System.Windows.Automation.SelectionPattern]::Pattern).Current.GetSelection()
 if ($selected.Count -ne 1 -or $selected[0].Current.Name -ne '大') { throw 'Font size did not survive process exit' }
 Invoke-Control NavHome
 Invoke-Control PauseSync

@@ -12,13 +12,13 @@
    <Image Source="Assets/rustclipsync.png" Width="36" Height="36" AutomationProperties.Name="RustClipSync 图标"/>
    <TextBlock Text="RustClipSync" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center"/>
   </StackPanel>
-  <NavigationView x:Name="Navigation" Grid.Row="1" PaneDisplayMode="Top" IsSettingsVisible="False" IsBackButtonVisible="Collapsed" IsPaneToggleButtonVisible="False" SelectionChanged="Navigation_SelectionChanged">
+  <NavigationView x:Name="Navigation" Grid.Row="1" PaneDisplayMode="Top" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" IsSettingsVisible="False" IsBackButtonVisible="Collapsed" IsPaneToggleButtonVisible="False" SelectionChanged="Navigation_SelectionChanged">
    <NavigationView.MenuItems>
     <NavigationViewItem x:Name="HomeNav" Content="主页" Icon="Home" Tag="home" AutomationProperties.AutomationId="NavHome"/>
     <NavigationViewItem x:Name="AppearanceNav" Content="外观" Tag="appearance" AutomationProperties.AutomationId="NavAppearance"><NavigationViewItem.Icon><FontIcon Glyph="&#xE790;"/></NavigationViewItem.Icon></NavigationViewItem>
     <NavigationViewItem x:Name="SettingsNav" Content="设置" Icon="Setting" Tag="settings" AutomationProperties.AutomationId="NavSettings"/>
    </NavigationView.MenuItems>
-   <ScrollViewer HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+   <ScrollViewer HorizontalContentAlignment="Stretch" VerticalContentAlignment="Top" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
     <Grid Padding="24,16,24,24" MaxWidth="840" HorizontalAlignment="Stretch" RowSpacing="16">
      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
      <InfoBar x:Name="Notice" IsOpen="False" IsClosable="True" Severity="Informational"/>

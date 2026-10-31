@@ -1,58 +1,61 @@
-# WinUI 与 Rust 的本地通信草案
+# WinUI 与 Rust 本地通信
 
-此文档定义后续实现边界，尚无 Named Pipe 代码。它不是服务端 HTTP 协议的新版本。
+0.2.0 已实现请求/响应 Named Pipe。当前 UI 在打开时每 2 秒读取快照，关闭窗口停止查询；没有常驻 .NET 同步循环。后续事件订阅不属于本版实现。服务端 HTTP 协议不变。
 
-## 通道与权限
+## 通道与边界
 
-使用本机双向 Named Pipe，名称按产品、用户配置和登录会话区分。Rust 创建显式安全描述符，限制到当前登录会话的 Logon SID；设置拒绝远程客户端。不要使用默认 DACL，因为默认权限可能允许 Everyone/匿名读取。[微软 Named Pipe 安全文档](https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipe-security-and-access-rights)
+管道名为 `RustClipSync.<Windows 用户 SID 的 SHA-256 前 16 位>.<SessionId>`。用户与会话区分不构成身份认证，权限由以下措施实施：
 
-首次创建使用防止已有服务端实例抢占的选项；UI 和 agent 校验对端进程用户、会话及安装位置。Pipe 名、客户端自报 PID、用户名都不是身份认证。该设计不承诺防御同一用户权限的恶意软件。
+- 使用显式、受保护的 DACL，仅授予当前 Logon SID 读写权限。
+- 设置 `PIPE_REJECT_REMOTE_CLIENTS`、`FILE_FLAG_FIRST_PIPE_INSTANCE`。
+- 双方检查管道对端 PID、登录会话与安装目录的实际映像路径。后台仅接受同目录 WinUI/agent 组件。
+- 客户端不允许后台通过通道冒用自己的令牌；同用户恶意软件不在该隔离边界的防御范围内。
+- Win32 I/O 使用 overlapped 事件等待、截止时间和取消，空闲时不做忙等。
 
-## 帧与生命周期
+## 帧与交付
 
-- 字节流：4 字节小端无符号长度，然后是 UTF-8 JSON。
-- 整帧最大 1 MiB，命令和响应 DTO 有更小的字段上限。正文按分页/有界预览显示，不在状态事件中携带 10 MiB 文本。
-- 单连接限制未完成请求数；连接与帧读取有超时。事件采用有界队列，状态可合并；落后客户端重新获取快照。
-- 协商 `ipcVersion: 1`，未知不兼容版本拒绝连接。该数字不出现在产品名称里。
-- UI 连接时发送 hello、读取快照并订阅事件。UI 关闭断开订阅，不暂停 agent；全局退出必须发明确命令。
+一次连接处理一次请求：
 
-## 消息形状
+1. 客户端发送 4 字节小端长度与 UTF-8 JSON。
+2. 后台返回相同结构的响应。
+3. 客户端读完整个响应后，发送单字节 `0x01` 作为传输收据。
+4. 后台读到收据后才断开。否则 `DisconnectNamedPipe` 会丢弃尚未读完的响应缓冲。
+
+请求与响应各不超过 256 KiB。帧读写限时 4 秒，命令队列最多 16 个请求，执行前检查截止时间；配置/网络操作最长等待确认 60 秒，UI 连接及整次操作也有超时。管道关闭后不会自动重发操作。退出命令在响应收据之后才触发后台关闭。
+
+传输收据不等于服务端剪贴板消息的 ack；消息游标及 applied/skipped 确认仍由共享核心管理。
 
 ```json
-{"id":"req-42","method":"getStatus","params":{}}
+{"id":"a-unique-request-id","ipcVersion":1,"method":"setPaused","params":{"paused":true}}
 ```
 
 ```json
-{"id":"req-42","ok":true,"result":{"state":"connected","paused":false,"pending":false}}
+{"id":"a-unique-request-id","ok":true,"result":{}}
 ```
 
 ```json
-{"id":"req-42","ok":false,"error":{"code":"storage_error","retryable":false}}
+{"id":"a-unique-request-id","ok":false,"error":"settings_changed"}
 ```
 
-```json
-{"event":"statusChanged","sequence":18,"data":{"state":"offline","pending":true}}
-```
+`ipcVersion` 仅用于兼容性，产品页面不使用该数字。ID 为连接请求的关联标识；UI 不自动重试非幂等操作。出现 `operation_unconfirmed` 时先刷新状态，不能把未收到响应当作操作未执行。
 
-事件 sequence 仅用于此 agent 生命周期的 UI 更新，不作为消息 revision。异常只返回固定错误码和允许公开的字段；不得透传包含凭据/正文的底层错误字符串。
+## 命令
 
-## 命令范围
-
-| 命令 | 行为 |
+| 方法 | 参数 / 行为 |
 | --- | --- |
-| hello / getStatus / subscribe | 协商、快照、增量事件 |
-| getSettings / updateSettings | 读取脱敏配置、验证并保存配置；拒绝未知字段 |
-| pair / rePair | 受保护通道内提交密码；rePair 要求明确确认丢弃旧身份/待发送内容 |
-| setPaused / setDirection | 设置目标状态，不用可重复翻转的 toggle 命令 |
-| pushNow / pullNow | 明确的手动操作，仍遵守敏感策略；冲突覆盖须带确认 |
-| listHistory / listInbox | 分页返回受限预览，默认遮挡敏感项 |
-| copyItem | 通过条目 ID 让 agent 写入剪贴板；正文不必经过 UI |
-| deleteHistory / clearHistory | 删除历史，不修改 cursor/device identity |
-| exportDiagnostics | 仅导出脱敏诊断 |
-| quit | 保存状态并退出 agent |
+| getStatus | 状态、暂停标记、脱敏配置、配置 revision、设备 ID、游标、待办、最近同步、历史错误与敏感收件项元数据；无正文和令牌 |
+| setPaused | `{paused: bool}`，设置目标状态并持久化 |
+| updateSettings | `{config: ..., expectedRevision: u64}`，验证并原子保存；拒绝变更配对身份与过期 revision |
+| pushNow / pullNow | 用户明确触发；保持敏感/过滤/游标规则，冲突覆盖在 UI 请求确认 |
+| testFilter | `{filter: ..., text: ...}`，最多 64 KiB 测试文本，不写剪贴板或服务端 |
+| listHistory | `{offset, query, favorites}`，每页 20 条、每条最多 240 字符预览 |
+| copyHistory / deleteHistory | `{id}`，后台按 ID 查找；复制正文无需通过 UI |
+| setFavorite | `{id, favorite}`，最多 50 条并受总容量约束 |
+| clearHistory | 清理普通历史与收藏，不修改同步身份、游标或敏感收件项 |
+| copyInbox / clearInbox | `{id}`，验证仍是当前收件项，防止陈旧命令作用到后来的消息 |
+| exportDiagnostics | 固定状态、版本、暂停/待办/历史错误，不含账号、正文、令牌或过滤规则 |
+| quit | 完成响应交付后保存/退出后台 |
 
-普通配置响应不包含设备 token、状态密钥、账户密码。`pair` 密码不写配置文件，不进入日志；完成后释放输入缓冲区，避免承诺托管内存一定即时清零。
+首次配对仍使用专用 `pair --password-stdin` 子进程。账户密码不进入通用状态通道，不落盘；重新配对必须经 UI 明确确认。主题/字号为独立的非敏感界面偏好；自启设置直接管理经过目标验证的当前用户 `.lnk`，与同步配置分开。
 
-请求 ID 在连接内唯一。读操作允许重试；非幂等动作断线后先查状态，不自动再次执行。后续实现须为手动上传等操作增加可查询的操作 ID，或在会话内缓存结果，防止 UI 超时重试生成另一条复制消息。
-
-契约文件与 C#/Rust DTO 必须配套跨语言样例测试，枚举、可空字段、整数范围、最大长度及错误码统一维护。UI 展示消息与 Rust 同步状态分离，不能把 UI 内部页面状态写入核心协议对象。
+固定错误码包括 `invalid_request`、`invalid_filter`、`busy`、`settings_changed`、`storage_error`、`history_error`、`credentials`、`conflict`、`expired`、`re_pair`、`clipboard_error`、`operation_unconfirmed` 和 `needs_restart`。不透传底层 HTTP/正文错误字符串。
