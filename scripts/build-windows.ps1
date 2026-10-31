@@ -5,40 +5,20 @@ $installer = Join-Path $root 'dist/installer'
 New-Item -ItemType Directory -Force $bundle,$installer | Out-Null
 & dotnet publish "$root/ui/RustClipSync/RustClipSync.csproj" -c Release -r win-x64 -p:Platform=x64 --self-contained true -o $bundle
 if ($LASTEXITCODE -ne 0) { throw 'WinUI publish failed' }
-# An unpackaged app needs its own resource index, including compiled XAML.
-# See https://learn.microsoft.com/windows/apps/windows-app-sdk/mrtcore/localize-strings#loading-strings-in-unpackaged-applications
-$app = Get-ChildItem "$root/ui/RustClipSync/bin" -Recurse -Filter 'RustClipSync.exe' | Select-Object -First 1
-if (!$app) { throw 'The WinUI build output is missing' }
-$resources = Join-Path $root 'dist/app-resources'
-New-Item -ItemType Directory -Force "$resources/Assets" | Out-Null
-$xbf = @(Get-ChildItem $app.DirectoryName -Recurse -Filter '*.xbf')
-if ($xbf.Count -lt 2) { throw 'Compiled App and MainWindow XAML files are missing' }
-foreach ($file in $xbf) {
-    $relative = [IO.Path]::GetRelativePath($app.DirectoryName,$file.FullName)
-    foreach ($base in @($bundle,$resources)) {
-        $target = Join-Path $base $relative
-        New-Item -ItemType Directory -Force (Split-Path $target) | Out-Null
-        Copy-Item $file.FullName $target -Force
-    }
-}
-Copy-Item "$root/assets/rustclipsync.png","$root/assets/rustclipsync.ico" "$resources/Assets" -Force
-# Merge WinUI's embedded theme/control resources into the unpackaged app index.
-# Keeping only our XBF entries makes XamlControlsResources fail at startup.
-Get-ChildItem $bundle -Filter '*.pri' | Where-Object Name -ne 'resources.pri' | Copy-Item -Destination $resources -Force
+# WinUI's build tooling emits a merged application/framework index named after
+# the assembly. The unpackaged runtime discovers resources.pri beside the EXE.
+$pri = Join-Path $bundle 'RustClipSync.pri'
+if (!(Test-Path $pri)) { throw 'The merged WinUI application resource index is missing' }
+Copy-Item $pri "$bundle/resources.pri" -Force
 if (!(Test-Path "$bundle/Assets/rustclipsync.ico")) { throw 'Application icon asset is missing' }
 $makepri = Get-ChildItem "${env:ProgramFiles(x86)}/Windows Kits/10/bin" -Recurse -Filter 'makepri.exe' |
     Where-Object { $_.Directory.Name -eq 'x64' } | Sort-Object FullName -Descending | Select-Object -First 1
 if (!$makepri) { throw 'Windows SDK makepri.exe is required' }
-$config = Join-Path $root 'dist/priconfig.xml'
-& $makepri.FullName createconfig /cf $config /dq en-US /o
-if ($LASTEXITCODE -ne 0) { throw 'PRI configuration generation failed' }
-[xml]$xml = Get-Content $config -Raw
-@($xml.SelectNodes('//packaging')) | ForEach-Object { $_.ParentNode.RemoveChild($_) | Out-Null }
-$xml.Save($config)
-& $makepri.FullName new /pr $resources /cf $config /of "$bundle/resources.pri" /in Application /o
-if ($LASTEXITCODE -ne 0) { throw 'Application resource index generation failed' }
 & $makepri.FullName dump /if "$bundle/resources.pri" /of "$root/dist/resources.xml" /o
-if ($LASTEXITCODE -ne 0 -or !(Select-String -Path "$root/dist/resources.xml" -Pattern 'MainWindow.xbf' -SimpleMatch)) { throw 'MainWindow is absent from the application resource index' }
+if ($LASTEXITCODE -ne 0) { throw 'Application resource index inspection failed' }
+foreach ($entry in @('MainWindow.xbf','themeresources.xbf')) {
+    if (!(Select-String -Path "$root/dist/resources.xml" -Pattern $entry -SimpleMatch)) { throw "Missing compiled XAML resource: $entry" }
+}
 Copy-Item "$root/target/release/rustclipsync-agent.exe" $bundle -Force
 Copy-Item "$root/LICENSE" "$bundle/LICENSE.txt" -Force
 # Bundle the redistributable app-local C/C++ runtime for machines without a
