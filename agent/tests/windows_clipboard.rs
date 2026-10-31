@@ -75,13 +75,20 @@ fn sensitive_auto_write_is_opt_in_marked_and_suppresses_its_own_notifications() 
     let a = WindowsClipboard::new(window.hwnd(), formats);
     let reader = WindowsClipboard::new(window.hwnd(), formats);
     a.snapshot(true).unwrap();
+    // Synthetic multi-line key-shaped text; never a real credential.
+    let text = format!(
+        "-----BEGIN {}-----\n{}-----END {}-----\n",
+        "OPENSSH PRIVATE KEY",
+        "ZHVtbXktbm90LWEtdmFsaWQta2V5\n".repeat(256),
+        "OPENSSH PRIVATE KEY"
+    );
     let id = state::random_uuid().unwrap();
     assert!(matches!(
-        a.write("marked fixture", &id, true),
+        a.write(&text, &id, true),
         Err(ClipboardError::Sensitive)
     ));
     a.set_auto_apply_sensitive(true);
-    a.write("marked fixture", &id, true).unwrap();
+    a.write(&text, &id, true).unwrap();
     sensitive_flags(&window);
     assert!(a.observe(true).unwrap().unchanged);
     assert!(a.observe(true).unwrap().unchanged);
@@ -89,14 +96,11 @@ fn sensitive_auto_write_is_opt_in_marked_and_suppresses_its_own_notifications() 
         reader.snapshot(false),
         Err(ClipboardError::Sensitive)
     ));
-    assert_eq!(
-        reader.snapshot(true).unwrap(),
-        Some(("marked fixture".into(), true))
-    );
+    assert_eq!(reader.snapshot(true).unwrap(), Some((text.clone(), true)));
     a.set_auto_apply_sensitive(false);
     assert!(matches!(
         a.write("must not replace", &state::random_uuid().unwrap(), true),
         Err(ClipboardError::Sensitive)
     ));
-    assert_eq!(reader.snapshot(true).unwrap().unwrap().0, "marked fixture");
+    assert_eq!(reader.snapshot(true).unwrap().unwrap().0, text);
 }

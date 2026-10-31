@@ -56,6 +56,25 @@ internal sealed class AgentClient
         finally { gate.Release(); }
     }
     internal bool IsBusy => gate.CurrentCount == 0;
+    internal async Task<(string Text, bool Truncated)> ReadInboxPreview(string id)
+    {
+        var content = new StringBuilder(); var offset = 0; var total = 0;
+        for (var count = 0; count < 4; count++)
+        {
+            var chunk = await Call("readInbox", new { id, offset });
+            if (chunk.GetProperty("id").GetString() != id || chunk.GetProperty("offset").GetInt32() != offset) throw new IOException();
+            var text = chunk.GetProperty("text").GetString() ?? throw new IOException();
+            total = chunk.GetProperty("total").GetInt32();
+            var next = chunk.GetProperty("nextOffset").GetInt32();
+            if (total < 0 || total > 10 * 1024 * 1024 || next < offset || next > total || next - offset > 16 * 1024 || next - offset != Encoding.UTF8.GetByteCount(text) || (next == offset && next != total)) throw new IOException();
+            content.Append(text); offset = next;
+            if (offset == total) break;
+        }
+        var snapshot = await Call("getStatus");
+        var inbox = snapshot.GetProperty("inbox");
+        if (inbox.ValueKind == JsonValueKind.Null || inbox.GetProperty("id").GetString() != id) throw new AgentError("invalid_request");
+        return (content.ToString(), offset < total);
+    }
     internal static Process? Find()
     {
         using var current = Process.GetCurrentProcess();

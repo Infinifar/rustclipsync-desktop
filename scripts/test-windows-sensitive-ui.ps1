@@ -13,6 +13,23 @@ public static class InspectorWindowTest {
 }
 '@
 Invoke-Control NavHome
+Invoke-Control RevealHomeSensitiveText
+if ((Get-Control HomeSensitiveText).Current.Name -ne 'UI private fixture') { throw 'Home explicit reveal did not read the inbox body' }
+Invoke-Control RevealHomeSensitiveText
+if ((Get-Control HomeSensitiveText).Current.Name -ne '••••••••') { throw 'Home hide left visible plaintext' }
+Invoke-Control RevealHomeSensitiveText
+Invoke-Control NavAppearance
+Invoke-Control NavHome
+if ((Get-Control HomeSensitiveText).Current.Name -ne '••••••••') { throw 'Navigating away did not conceal home plaintext' }
+# Text actions must remain in the requested order on one horizontal row.
+$previous = $null
+foreach ($id in @('CopyHomeSensitiveText','RevealHomeSensitiveText','DeleteHomeSensitiveText','OpenSensitiveSettings')) {
+    $bounds = (Get-Control $id).Current.BoundingRectangle
+    if ($bounds.Width -le 0) { throw "Home inbox action has no layout: $id" }
+    if ($previous -and ([Math]::Abs($previous.Top-$bounds.Top) -gt 2 -or $bounds.Left -lt $previous.Right)) { throw 'Home inbox actions were not in one ordered row' }
+    $previous = $bounds
+}
+Save-Screen 'home-sensitive-inbox'
 $mainWindow = $script:window
 $mainHandle = [InspectorWindowTest]::GetAncestor([IntPtr]$mainWindow.Current.NativeWindowHandle,2)
 function Get-InspectorWindows {
@@ -76,4 +93,14 @@ Start-Sleep -Milliseconds 400
 if ($ui.HasExited) { throw 'Closing inspector stopped the main UI process' }
 [InspectorWindowTest]::ShowWindow($mainHandle,9) | Out-Null
 $script:window = $mainWindow
+Invoke-Control NavAppearance
+Invoke-Control NavHome
+$end = (Get-Date).AddSeconds(10)
+do { if (!(Get-Control RevealHomeSensitiveText).Current.IsEnabled) { break }; Start-Sleep -Milliseconds 100 } while ((Get-Date) -lt $end)
+if ((Get-Control HomeSensitiveText).Current.Name -ne '暂无敏感收件项') { throw 'Deleting the inbox did not leave a visible empty state on home' }
+foreach ($id in @('CopyHomeSensitiveText','RevealHomeSensitiveText','DeleteHomeSensitiveText')) {
+    if ((Get-Control $id).Current.IsEnabled) { throw "Deleted inbox action still enabled: $id" }
+}
+if (!(Get-Control OpenSensitiveSettings).Current.IsEnabled) { throw 'Settings disappeared with empty home inbox' }
+Save-Screen 'home-empty-sensitive-inbox'
 Write-Output 'PASS: sensitive inspector, minimized main, default masking, explicit reveal/hide, real pin/unpin, copy, delete and window reuse.'

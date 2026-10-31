@@ -44,14 +44,19 @@
         <Button Content="连接设置" Click="OpenSettings_Click"/>
         <Button x:Name="StopButton" Content="退出后台" Click="Stop_Click" IsEnabled="False"/>
        </StackPanel>
-       <Border x:Name="InboxCard" Visibility="Collapsed" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+       <Border x:Name="InboxCard" AutomationProperties.AutomationId="SensitiveInboxCard" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
         <StackPanel Spacing="10">
-         <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="敏感收件区" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"/><HyperlinkButton Grid.Column="1" Content="以小窗显示" Click="OpenInboxWindow_Click" AutomationProperties.AutomationId="OpenSensitiveWindow"/></Grid>
-         <TextBlock Text="••••••••" FontSize="24"/>
-         <TextBlock x:Name="InboxTime" Style="{StaticResource Note}"/>
-         <TextBlock Text="此内容未写入系统剪贴板。关闭历史记录时，仍可使用当前收件项。" Style="{StaticResource Note}"/>
-         <StackPanel Orientation="Horizontal" Spacing="10"><Button Content="复制到剪贴板" Click="CopyInbox_Click"/><Button Content="删除" Click="ClearInbox_Click"/></StackPanel>
-         <Button Content="自动写入设置" Click="OpenPrivacySettings_Click" AutomationProperties.AutomationId="OpenSensitiveSettings"/>
+         <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="敏感收件区" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"/><HyperlinkButton x:Name="OpenInboxButton" Grid.Column="1" Content="以小窗显示" Click="OpenInboxWindow_Click" IsEnabled="False" AutomationProperties.AutomationId="OpenSensitiveWindow"/></Grid>
+         <ScrollViewer MaxHeight="120" VerticalScrollBarVisibility="Auto" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled"><TextBlock x:Name="InboxText" Text="暂无敏感收件项" TextWrapping="Wrap" AutomationProperties.AutomationId="HomeSensitiveText"/></ScrollViewer>
+         <TextBlock x:Name="InboxPreviewNote" Text="内容较长，仅显示开头部分；复制会复制完整原文。" Visibility="Collapsed" Style="{StaticResource Note}"/>
+         <TextBlock x:Name="InboxTime" Text="收到时间：—" Style="{StaticResource Note}" AutomationProperties.AutomationId="HomeSensitiveTime"/>
+         <TextBlock Text="仅保留最新的手动收件项；自动写入模式的新内容不会存入此处。" Style="{StaticResource Note}"/>
+         <ScrollViewer HorizontalScrollMode="Auto" HorizontalScrollBarVisibility="Auto" VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled"><StackPanel Orientation="Horizontal" Spacing="8" AutomationProperties.AutomationId="HomeSensitiveActions">
+          <HyperlinkButton x:Name="CopyInboxButton" Padding="4,6" Content="复制到剪贴板" Click="CopyInbox_Click" IsEnabled="False" AutomationProperties.AutomationId="CopyHomeSensitiveText"/>
+          <HyperlinkButton x:Name="RevealInboxButton" Padding="4,6" Content="显示" Click="RevealInbox_Click" IsEnabled="False" AutomationProperties.AutomationId="RevealHomeSensitiveText"/>
+          <HyperlinkButton x:Name="DeleteInboxButton" Padding="4,6" Content="删除" Click="ClearInbox_Click" IsEnabled="False" AutomationProperties.AutomationId="DeleteHomeSensitiveText"/>
+          <HyperlinkButton Padding="4,6" Content="自动写入设置" Click="OpenPrivacySettings_Click" AutomationProperties.AutomationId="OpenSensitiveSettings"/>
+         </StackPanel></ScrollViewer>
         </StackPanel>
        </Border>
        <Expander x:Name="HistoryPanel" Header="剪贴板历史" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Expanding="History_Expanding" AutomationProperties.AutomationId="HistoryPanel">
@@ -123,7 +128,7 @@
        </Expander>
        <StackPanel Orientation="Horizontal" Spacing="10"><Button x:Name="SaveSettingsButton" Content="保存同步设置" Style="{ThemeResource AccentButtonStyle}" Click="SaveSettings_Click" AutomationProperties.AutomationId="SaveSyncSettings"/><Button AutomationProperties.AutomationId="ReloadSettings" Content="重新载入" Click="ReloadSettings_Click"/></StackPanel>
        <Expander Header="关于与诊断" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
-        <StackPanel Spacing="12"><TextBlock Text="RustClipSync 0.2.1" FontWeight="SemiBold"/><TextBlock Text="与 Android 输入法和 Omaclipsync 使用同一同步协议。界面关闭后，后台同步独立运行。" Style="{StaticResource Note}"/>
+        <StackPanel Spacing="12"><TextBlock Text="RustClipSync 0.2.2" FontWeight="SemiBold"/><TextBlock Text="与 Android 输入法和 Omaclipsync 使用同一同步协议。界面关闭后，后台同步独立运行。" Style="{StaticResource Note}"/>
          <StackPanel Orientation="Horizontal" Spacing="8"><HyperlinkButton Content="服务端" NavigateUri="https://github.com/Infinifar/rustclipsync-server"/><HyperlinkButton Content="Android 输入法" NavigateUri="https://github.com/Infinifar/fcitx5-android-bibi-keyboard"/><HyperlinkButton Content="Omaclipsync" NavigateUri="https://github.com/Infinifar/omaclipsync"/></StackPanel>
          <Button Content="导出脱敏诊断" Click="Diagnostics_Click"/><TextBlock x:Name="DiagnosticsResult" IsTextSelectionEnabled="True" Style="{StaticResource Note}"/>
         </StackPanel>

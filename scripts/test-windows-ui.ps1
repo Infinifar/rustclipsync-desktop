@@ -59,6 +59,11 @@ Save-Screen 'settings-startup'
 $toggle.Toggle(); Start-Sleep -Milliseconds 400
 if (Test-Path $startup) { throw 'UI did not remove startup shortcut when disabled' }
 Invoke-Control NavHome
+if ((Get-Control HomeSensitiveText).Current.Name -notlike '*收件项*') { throw 'Home sensitive inbox has no empty/unavailable state' }
+foreach ($id in @('CopyHomeSensitiveText','RevealHomeSensitiveText','DeleteHomeSensitiveText')) {
+    if ((Get-Control $id).Current.IsEnabled) { throw "Empty home inbox action was enabled: $id" }
+}
+if (!(Get-Control OpenSensitiveSettings).Current.IsEnabled) { throw 'Empty inbox does not provide its settings action' }
 Save-Screen 'home-dark'
 foreach ($id in @('PushNow','PullNow','PauseSync','SyncDirection')) {
     $control = Get-Control $id

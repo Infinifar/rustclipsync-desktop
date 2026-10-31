@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
-using System.Text;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -97,27 +96,11 @@ public sealed partial class SensitiveInboxWindow : Window
         busy = true; Controls();
         try
         {
-            // Read only after the user asks to reveal. The preview is bounded;
-            // copyInbox still copies the full original inside Rust.
-            var content = new StringBuilder(); var offset = 0; var total = 0; var chunks = 0;
-            do
-            {
-                var chunk = await agent.Call("readInbox", new { id, offset });
-                if (closed || generation != requestGeneration) return;
-                if (chunk.GetProperty("id").GetString() != id || chunk.GetProperty("offset").GetInt32() != offset) throw new IOException();
-                var text = chunk.GetProperty("text").GetString() ?? throw new IOException();
-                total = chunk.GetProperty("total").GetInt32();
-                var next = chunk.GetProperty("nextOffset").GetInt32();
-                if (total < 0 || total > 10 * 1024 * 1024 || next < offset || next > total || next - offset != Encoding.UTF8.GetByteCount(text) || (next == offset && next != total)) throw new IOException();
-                content.Append(text); offset = next; chunks++;
-            } while (offset < total && chunks < 4);
-            var snapshot = await agent.Call("getStatus");
-            if (closed || generation != requestGeneration) return;
-            Metadata(snapshot);
-            if (inboxId != id || generation != requestGeneration) return;
-            SecretText.Text = content.ToString(); SecretText.IsTextSelectionEnabled = true;
+            var preview = await agent.ReadInboxPreview(id);
+            if (closed || generation != requestGeneration || inboxId != id) return;
+            SecretText.Text = preview.Text; SecretText.IsTextSelectionEnabled = true;
             revealed = true; RevealButton.Content = "隐藏";
-            if (offset < total) { Notice.Title = "仅显示开头部分"; Notice.Message = "内容较长。复制按钮仍会复制完整原文。"; Notice.Severity = InfoBarSeverity.Informational; Notice.IsOpen = true; }
+            if (preview.Truncated) { Notice.Title = "仅显示开头部分"; Notice.Message = "内容较长。复制按钮仍会复制完整原文。"; Notice.Severity = InfoBarSeverity.Informational; Notice.IsOpen = true; }
         }
         catch { if (!closed) { HideText(); Error(); } }
         finally { busy = false; if (!closed) Controls(); }

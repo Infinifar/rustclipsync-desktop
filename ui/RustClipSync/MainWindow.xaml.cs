@@ -14,6 +14,8 @@ public sealed partial class MainWindow : Window
     private bool initialized, updating, busy, closed, running, paused, formLoaded;
     private string state = "stopped";
     private string? inboxId;
+    private bool inboxRevealed;
+    private long inboxGeneration;
     private long lastSync;
     private ulong lastHistoryRevision;
     private int historyOffset, historyTotal;
@@ -53,7 +55,8 @@ public sealed partial class MainWindow : Window
             await Refresh(); timer.Start();
         };
         timer.Tick += async (_, _) => { if (!busy && !agent.IsBusy && !closed) await Refresh(); };
-        Closed += (_, _) => { closed = true; timer.Stop(); agent.Close(); };
+        Closed += (_, _) => { closed = true; HideInbox(); timer.Stop(); agent.Close(); };
+        Activated += (_, args) => { if (args.WindowActivationState == WindowActivationState.Deactivated) HideInbox(); };
     }
     private void SetMinimumWindowSize(double scale)
     {
@@ -92,6 +95,7 @@ public sealed partial class MainWindow : Window
         PauseButton.IsEnabled = !value; StopButton.IsEnabled = !value && running;
         DirectionBox.IsEnabled = !value && running;
         HistoryPanel.IsEnabled = !value && running;
+        InboxControls();
     }
     private async Task<bool> Confirm(string title, string message, string action)
     {
@@ -102,6 +106,7 @@ public sealed partial class MainWindow : Window
     {
         if (HomePage is null || AppearancePage is null || SettingsPage is null) return;
         var page = (args.SelectedItem as NavigationViewItem)?.Tag as string;
+        if (page != "home") HideInbox();
         HomePage.Visibility = page == "home" ? Visibility.Visible : Visibility.Collapsed;
         AppearancePage.Visibility = page == "appearance" ? Visibility.Visible : Visibility.Collapsed;
         SettingsPage.Visibility = page == "settings" ? Visibility.Visible : Visibility.Collapsed;
@@ -147,6 +152,7 @@ public sealed partial class MainWindow : Window
         using var process = AgentClient.Find(); running = process is not null;
         if (!running)
         {
+            InboxMetadata(null, "后台未启动，暂时无法读取收件项");
             state = "stopped"; StateText.Text = config is null ? "尚未配置连接" : "后台未启动";
             PauseButton.Content = config is null ? "配置连接" : "启动同步";
             ServerText.Text = $"服务端：{config?.Server ?? "尚未配置"}";
@@ -166,9 +172,7 @@ public sealed partial class MainWindow : Window
             var timestamp = snapshot.GetProperty("lastSync").GetInt64();
             LastSyncText.Text = timestamp == 0 ? "最近同步：本次运行尚未同步" : $"最近同步：{Time(timestamp)}";
             PendingText.Visibility = snapshot.GetProperty("pending").GetBoolean() ? Visibility.Visible : Visibility.Collapsed;
-            var inbox = snapshot.GetProperty("inbox"); inboxId = inbox.ValueKind == JsonValueKind.Null ? null : inbox.GetProperty("id").GetString();
-            InboxCard.Visibility = inboxId is null ? Visibility.Collapsed : Visibility.Visible;
-            if (inboxId is not null) InboxTime.Text = $"收到时间：{Time(inbox.GetProperty("receivedAt").GetInt64())}";
+            InboxMetadata(snapshot.GetProperty("inbox"));
             PauseButton.Content = paused ? "恢复" : "暂停";
             updating = true; DirectionBox.SelectedIndex = config.Direction == "download" ? 2 : config.Direction == "upload" ? 1 : 0; updating = false;
             HistoryNote.Text = config.History.Enabled ? $"本地历史已加密，普通记录保留 {config.History.Days} 天；收藏保留至手动删除。" : "历史记录未开启。已有记录仍按期限清理，可在设置中开启或手动清空。";
@@ -178,7 +182,7 @@ public sealed partial class MainWindow : Window
             if (HistoryPanel.IsExpanded && (timestamp != lastSync || historyRevision != lastHistoryRevision)) await LoadHistory();
             lastSync = timestamp; lastHistoryRevision = historyRevision;
         }
-        catch { if (!closed) StateText.Text = "后台正在启动或处理操作"; }
+        catch { if (!closed) { StateText.Text = "后台正在启动或处理操作"; InboxMetadata(null, "暂时无法读取收件项"); } }
         finally { if (!closed) SetBusy(busy); }
     }
     private static string Time(long timestamp) => DateTimeOffset.FromUnixTimeSeconds(timestamp).ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
@@ -275,7 +279,8 @@ public sealed partial class MainWindow : Window
     }
     private void OpenInboxWindow_Click(object sender, RoutedEventArgs e)
     {
-        if (inboxId is null) return;
+        if (!running) return;
+        HideInbox();
         try
         {
             if (inboxWindow is null)
@@ -361,7 +366,44 @@ public sealed partial class MainWindow : Window
         if (busy || id is null || !await Confirm("复制敏感文本？", "此操作会将敏感文本写入系统剪贴板，其他应用可以读取。会附带敏感标记，请求排除 Windows 剪贴板历史和云同步。", "复制")) return;
         await Action("copyInbox", new { id });
     }
-    private async void ClearInbox_Click(object sender, RoutedEventArgs e) { if (!busy && inboxId is not null) await Action("clearInbox", new { id = inboxId }); }
+    private async void ClearInbox_Click(object sender, RoutedEventArgs e) { if (!busy && inboxId is not null) { var id = inboxId; HideInbox(); await Action("clearInbox", new { id }); } }
+    private void HideInbox()
+    {
+        inboxGeneration++; inboxRevealed = false;
+        InboxText.Text = inboxId is null ? "暂无敏感收件项" : "••••••••";
+        InboxText.IsTextSelectionEnabled = false; RevealInboxButton.Content = "显示";
+        InboxPreviewNote.Visibility = Visibility.Collapsed;
+    }
+    private void InboxControls()
+    {
+        CopyInboxButton.IsEnabled = RevealInboxButton.IsEnabled = DeleteInboxButton.IsEnabled = !busy && running && inboxId is not null;
+        OpenInboxButton.IsEnabled = !busy && running;
+    }
+    private void InboxMetadata(JsonElement? inbox, string? unavailable = null)
+    {
+        var id = inbox.HasValue && inbox.Value.ValueKind == JsonValueKind.Object ? inbox.Value.GetProperty("id").GetString() : null;
+        if (id != inboxId || unavailable is not null) { inboxId = id; HideInbox(); }
+        InboxText.Text = id is null ? unavailable ?? "暂无敏感收件项" : InboxText.Text;
+        InboxTime.Text = id is null ? "收到时间：—" : $"收到时间：{Time(inbox!.Value.GetProperty("receivedAt").GetInt64())}";
+        InboxControls();
+    }
+    private async void RevealInbox_Click(object sender, RoutedEventArgs e)
+    {
+        if (busy || inboxId is null) return;
+        if (inboxRevealed) { HideInbox(); return; }
+        var id = inboxId; var generation = ++inboxGeneration;
+        SetBusy(true);
+        try
+        {
+            var preview = await agent.ReadInboxPreview(id);
+            if (closed || generation != inboxGeneration || id != inboxId) return;
+            InboxText.Text = preview.Text; InboxText.IsTextSelectionEnabled = true;
+            InboxPreviewNote.Visibility = preview.Truncated ? Visibility.Visible : Visibility.Collapsed;
+            inboxRevealed = true; RevealInboxButton.Content = "隐藏";
+        }
+        catch (Exception error) { if (!closed) { HideInbox(); Error(error); } }
+        finally { if (!closed) { SetBusy(false); await Refresh(); } }
+    }
     private async void Diagnostics_Click(object sender, RoutedEventArgs e)
     {
         if (busy) return;
