@@ -321,6 +321,11 @@ public sealed partial class MainWindow : Window
     }
     private async void WindowsStartup_Click(object sender, RoutedEventArgs e) { try { await Windows.System.Launcher.LaunchUriAsync(new Uri("ms-settings:startupapps")); } catch { Show("无法打开系统设置", "可从 Windows 设置 → 应用 → 启动查看。", InfoBarSeverity.Warning); } }
     private async void History_Expanding(Expander sender, ExpanderExpandingEventArgs args) { if (initialized) await HistoryContents.Refresh(); }
+    private async void ClearHistory_Click(object sender, RoutedEventArgs e)
+    {
+        if (busy || !await Confirm("清空本地历史？", "将删除普通历史与收藏，不改变同步身份、游标、敏感收件项或系统剪贴板。", "清空历史")) return;
+        await Action("clearHistory"); await HistoryContents.Refresh();
+    }
     private ulong shortcutRevision;
     private void LoadShortcuts()
     {
