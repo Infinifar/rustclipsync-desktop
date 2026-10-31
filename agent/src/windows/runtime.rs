@@ -23,7 +23,7 @@ use std::{
     },
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
-use windows_sys::Win32::UI::WindowsAndMessaging::{PostMessageW, WM_APP, WM_CLOSE};
+use windows_sys::Win32::UI::WindowsAndMessaging::{PostMessageW, WM_APP};
 pub const STATUS_CHANGED: u32 = WM_APP + 2;
 pub const WORKER_STOPPED: u32 = WM_APP + 3;
 struct Job {
@@ -110,12 +110,7 @@ impl Control {
                     json!({"version":env!("CARGO_PKG_VERSION"),"coreVersion":"0.2.0","state":*self.status.lock().map_err(|_|"unavailable")?,"paused":self.paused.load(Ordering::SeqCst),"pending":s.pending,"historyError":s.history_error}),
                 );
             }
-            Command::Quit {} => {
-                unsafe {
-                    PostMessageW(self.hwnd.load(Ordering::SeqCst) as _, WM_CLOSE, 0, 0);
-                }
-                return Ok(json!({}));
-            }
+            Command::Quit {} => return Ok(json!({})),
             _ => {}
         }
         if self.fatal.load(Ordering::SeqCst) {

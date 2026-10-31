@@ -15,13 +15,14 @@ internal sealed class AgentClient
     internal void Close() => lifetime.Cancel();
     internal static string AgentPath => Path.Combine(AppContext.BaseDirectory, "rustclipsync-agent.exe");
     internal static string DataPath => Path.Combine(Environment.GetEnvironmentVariable("LOCALAPPDATA") ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RustClipSync");
+    private static int CurrentSession { get { using var process = Process.GetCurrentProcess(); return process.SessionId; } }
     private static string PipeName
     {
         get
         {
             var sid = WindowsIdentity.GetCurrent().User?.Value ?? throw new IOException();
             var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sid))).ToLowerInvariant()[..16];
-            return $"RustClipSync.{fingerprint}.{Process.GetCurrentProcess().SessionId}";
+            return $"RustClipSync.{fingerprint}.{CurrentSession}";
         }
     }
     internal async Task<JsonElement> Call(string method, object? parameters = null)
@@ -35,7 +36,7 @@ internal sealed class AgentClient
             await pipe.ConnectAsync(1500, timeout.Token);
             if (!GetNamedPipeServerProcessId(pipe.SafePipeHandle, out var pid)) throw new IOException("peer_unavailable");
             using var peer = Process.GetProcessById(checked((int)pid));
-            if (peer.SessionId != Process.GetCurrentProcess().SessionId || !string.Equals(peer.MainModule?.FileName, AgentPath, StringComparison.OrdinalIgnoreCase)) throw new IOException("invalid_peer");
+            if (peer.SessionId != CurrentSession || !string.Equals(peer.MainModule?.FileName, AgentPath, StringComparison.OrdinalIgnoreCase)) throw new IOException("invalid_peer");
             var id = Guid.NewGuid().ToString();
             var request = JsonSerializer.SerializeToUtf8Bytes(new { id, ipcVersion = 1, method, @params = parameters ?? new { } }, Json);
             if (request.Length > 256 * 1024) throw new IOException("request_limit");
@@ -45,6 +46,7 @@ internal sealed class AgentClient
             var size = BitConverter.ToInt32(header);
             if (size <= 0 || size > 256 * 1024) throw new IOException("response_limit");
             var data = new byte[size]; await pipe.ReadExactlyAsync(data, timeout.Token);
+            await pipe.WriteAsync(new byte[] { 1 }, timeout.Token);
             using var result = JsonDocument.Parse(data);
             var root = result.RootElement;
             if (root.GetProperty("id").GetString() != id) throw new IOException("invalid_response");

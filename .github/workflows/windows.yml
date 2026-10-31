@@ -20,7 +20,8 @@ jobs:
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: target
-          key: windows-rust-1.99.1-${{ hashFiles('Cargo.lock') }}
+          key: windows-rust-1.99.1-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}
+          restore-keys: windows-rust-1.99.1-${{ hashFiles('Cargo.lock') }}-
       - run: python scripts/verify-core.py
       - run: cargo fmt --all -- --check
       - run: cargo clippy --locked --all-targets -- -D warnings
@@ -36,10 +37,6 @@ jobs:
         run: cargo test --locked --test windows_control -- --ignored --test-threads=1
       - name: Build native background agent
         run: cargo build --locked --release --bin rustclipsync-agent
-      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: target
-          key: windows-rust-1.99.1-${{ hashFiles('Cargo.lock') }}
       - name: Build self-contained WinUI and per-user installer
         shell: pwsh
         run: ./scripts/build-windows.ps1
@@ -60,6 +57,11 @@ jobs:
         with:
           name: rustclipsync-agent-windows-x64-development
           path: target/release/rustclipsync-agent.exe
+      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
+        if: always()
+        with:
+          path: target
+          key: windows-rust-1.99.1-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}
   portable:
     runs-on: ubuntu-latest
     timeout-minutes: 15

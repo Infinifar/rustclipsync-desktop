@@ -80,6 +80,7 @@ public sealed partial class MainWindow : Window
         HomePage.Visibility = page == "home" ? Visibility.Visible : Visibility.Collapsed;
         AppearancePage.Visibility = page == "appearance" ? Visibility.Visible : Visibility.Collapsed;
         SettingsPage.Visibility = page == "settings" ? Visibility.Visible : Visibility.Collapsed;
+        if (page == "settings" && initialized) { LoadForm(); ReadStartup(); }
     }
     private void OpenSettings_Click(object sender, RoutedEventArgs e) => Navigation.SelectedItem = SettingsNav;
     private void ReadConfig()
@@ -148,12 +149,14 @@ public sealed partial class MainWindow : Window
         finally { if (!closed) SetBusy(busy); }
     }
     private static string Time(long timestamp) => DateTimeOffset.FromUnixTimeSeconds(timestamp).ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
-    private async Task Action(string method, object? parameters = null)
+    private async Task<bool> Action(string method, object? parameters = null)
     {
-        if (busy) return; SetBusy(true);
-        try { var result = await agent.Call(method, parameters); if (!closed) { Show("操作完成", result.TryGetProperty("outcome", out var outcome) ? outcome.GetString() switch { "filtered" => "内容已被敏感策略或过滤规则阻止。", "current" or "skipped" => "没有需要应用的新内容；不会重放已接收的剪贴板。", "stored" => "已存入敏感收件区，未写入系统剪贴板。", _ => "同步操作已完成。" } : "设置或本地操作已完成。", InfoBarSeverity.Success); } }
+        if (busy) return false; SetBusy(true);
+        var success = false;
+        try { var result = await agent.Call(method, parameters); success = true; if (!closed) { Show("操作完成", result.TryGetProperty("outcome", out var outcome) ? outcome.GetString() switch { "filtered" => "内容已被敏感策略或过滤规则阻止。", "current" or "skipped" => "没有需要应用的新内容；不会重放已接收的剪贴板。", "stored" => "已存入敏感收件区，未写入系统剪贴板。", _ => "同步操作已完成。" } : "设置或本地操作已完成。", InfoBarSeverity.Success); } }
         catch (Exception error) { Error(error); }
         finally { SetBusy(false); await Refresh(); }
+        return success;
     }
     private async void Pause_Click(object sender, RoutedEventArgs e)
     {
@@ -221,7 +224,7 @@ public sealed partial class MainWindow : Window
         if (!double.IsFinite(IntervalBox.Value) || !double.IsFinite(HistoryLimitBox.Value) || !double.IsFinite(HistoryDaysBox.Value)) { Show("检查数值", "间隔、历史条数与天数必须填写有效整数。", InfoBarSeverity.Warning); return; }
         if (IntervalBox.Value != Math.Truncate(IntervalBox.Value) || HistoryLimitBox.Value != Math.Truncate(HistoryLimitBox.Value) || HistoryDaysBox.Value != Math.Truncate(HistoryDaysBox.Value)) { Show("检查数值", "请填写整数。", InfoBarSeverity.Warning); return; }
         var updated = config.Copy(); updated.AllowSensitive = SensitiveToggle.IsOn; updated.IntervalSec = (int)IntervalBox.Value; updated.Filter = FilterDraft(); updated.History = new() { Enabled = HistoryToggle.IsOn, Limit = (int)HistoryLimitBox.Value, Days = (int)HistoryDaysBox.Value };
-        await Action("updateSettings", new { config = updated, expectedRevision = formRevision });
+        if (await Action("updateSettings", new { config = updated, expectedRevision = formRevision })) LoadForm();
     }
     private async void ReloadSettings_Click(object sender, RoutedEventArgs e) { if (busy) return; await Refresh(); LoadForm(); ReadStartup(); }
     private async void TestFilter_Click(object sender, RoutedEventArgs e)

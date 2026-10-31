@@ -33,13 +33,11 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "chinesesimp"; MessagesFile: "ChineseSimplified.isl"
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut / 创建桌面快捷方式"; Flags: unchecked
-Name: "autostart"; Description: "Start synchronization at sign-in / 登录后自动同步"; Flags: unchecked
 [Files]
 Source: "{#BundleDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 [Icons]
 Name: "{autoprograms}\RustClipSync"; Filename: "{app}\RustClipSync.exe"; WorkingDir: "{app}"
 Name: "{autodesktop}\RustClipSync"; Filename: "{app}\RustClipSync.exe"; WorkingDir: "{app}"; Tasks: desktopicon
-Name: "{userstartup}\RustClipSync"; Filename: "{app}\rustclipsync-agent.exe"; Parameters: "autostart"; WorkingDir: "{app}"; Tasks: autostart
 [UninstallDelete]
 Type: files; Name: "{userstartup}\RustClipSync.lnk"
 [Run]

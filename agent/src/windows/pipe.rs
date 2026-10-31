@@ -233,9 +233,11 @@ fn handle(pipe: HANDLE, control: &Arc<Control>) -> io::Result<()> {
     transfer(pipe, &mut bytes, false, control)?;
     let request: Request =
         serde_json::from_slice(&bytes).map_err(|_| io::Error::other("invalid control request"))?;
-    let result = request
-        .command()
-        .and_then(|command| control.execute(command));
+    let command = request.command();
+    let quit = command
+        .as_ref()
+        .is_ok_and(|cmd| matches!(cmd, crate::ipc::Command::Quit {}));
+    let result = command.and_then(|command| control.execute(command));
     let response = Response::new(request.id, result);
     let mut body = serde_json::to_vec(&response)?;
     if body.len() > MAX_FRAME {
@@ -243,7 +245,25 @@ fn handle(pipe: HANDLE, control: &Arc<Control>) -> io::Result<()> {
     }
     let mut length = (body.len() as u32).to_le_bytes();
     transfer(pipe, &mut length, true, control)?;
-    transfer(pipe, &mut body, true, control)
+    transfer(pipe, &mut body, true, control)?;
+    // DisconnectNamedPipe discards unread buffered bytes. The client confirms
+    // it drained the complete response before this instance is disconnected.
+    let mut ack = [0u8; 1];
+    transfer(pipe, &mut ack, false, control)?;
+    if ack != [1] {
+        return Err(io::Error::other("invalid response receipt"));
+    }
+    if quit {
+        unsafe {
+            windows_sys::Win32::UI::WindowsAndMessaging::PostMessageW(
+                control.hwnd.load(Ordering::SeqCst) as _,
+                windows_sys::Win32::UI::WindowsAndMessaging::WM_CLOSE,
+                0,
+                0,
+            );
+        }
+    }
+    Ok(())
 }
 
 /// CLI bridge used for local diagnostics and native protocol integration tests.
@@ -276,5 +296,6 @@ pub fn call(bytes: &[u8]) -> io::Result<serde_json::Value> {
     }
     let mut result = vec![0; count];
     transfer(pipe.0, &mut result, false, &control)?;
+    transfer(pipe.0, &mut [1u8], true, &control)?;
     serde_json::from_slice(&result).map_err(io::Error::other)
 }
