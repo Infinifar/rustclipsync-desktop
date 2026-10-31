@@ -257,3 +257,5 @@ void Backend::testFilter(const QVariantMap &filter, const QString &text) {
         emit changed();
     });
 }
+
+void Backend::exitUi() { hideInbox(); QCoreApplication::exit(0); }

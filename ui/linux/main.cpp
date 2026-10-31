@@ -50,7 +50,12 @@ int main(int argc, char **argv) {
     QLockFile uiLock(directory + "/ui.lock");
     if (!smoke) {
         QLocalSocket existing; existing.connectToServer(socketName);
-        if (existing.waitForConnected(250)) { existing.write(action.toUtf8() + '\n'); existing.waitForBytesWritten(500); return 0; }
+        if (existing.waitForConnected(250)) {
+            existing.write(action.toUtf8() + '\n');
+            existing.waitForBytesWritten(500);
+            if (!existing.canReadLine() && !existing.waitForReadyRead(2500)) { qCritical("UI activation was not acknowledged"); return 1; }
+            return existing.readLine() == "ok\n" ? 0 : 1;
+        }
         if (!uiLock.tryLock(0)) { qCritical("Another UI instance is starting; retry activation"); return 1; }
         QLocalServer::removeServer(socketName);
         server.setSocketOptions(QLocalServer::UserAccessOption);
@@ -67,22 +72,29 @@ int main(int argc, char **argv) {
     engine.load(QUrl("qrc:/Main.qml"));
     if (engine.rootObjects().isEmpty()) return 1;
     auto root = engine.rootObjects().first();
-    auto activate = [root](const QString &command) { QMetaObject::invokeMethod(root, "activate", Q_ARG(QVariant, command)); };
+    auto activate = [root](const QString &command) {
+        const QVariant argument(command);
+        QMetaObject::invokeMethod(root, "activate", Q_ARG(QVariant, argument));
+    };
     QObject::connect(&server, &QLocalServer::newConnection, &app, [&server, activate] {
         while (auto socket = server.nextPendingConnection()) {
             struct ucred peer{}; socklen_t length = sizeof(peer);
             if (getsockopt(socket->socketDescriptor(), SOL_SOCKET, SO_PEERCRED, &peer, &length) != 0 || peer.uid != geteuid()) { socket->deleteLater(); continue; }
-            QObject::connect(socket, &QLocalSocket::readyRead, socket, [socket, activate] {
+            const auto readActivation = [socket, activate] {
                 if (socket->bytesAvailable() > 32) { socket->abort(); socket->deleteLater(); return; }
                 if (!socket->canReadLine()) return;
                 const auto command = QString::fromUtf8(socket->readLine(32)).trimmed();
-                if (command == "home" || command == "history" || command == "inbox") activate(command);
+                if (command == "home" || command == "history" || command == "inbox") {
+                    activate(command); socket->write("ok\n"); socket->flush();
+                }
                 socket->disconnectFromServer(); socket->deleteLater();
-            });
+            };
+            QObject::connect(socket, &QLocalSocket::readyRead, socket, readActivation);
+            if (socket->bytesAvailable()) readActivation();
             QTimer::singleShot(2000, socket, &QObject::deleteLater);
         }
     });
-    QObject::connect(&backend, &Backend::quitRequested, &app, &QCoreApplication::quit);
+    QObject::connect(&backend, &Backend::quitRequested, &app, [] { QCoreApplication::exit(0); });
     if (!smoke) QTimer::singleShot(0, root, [activate, action] { activate(action); });
     if (smoke) QTimer::singleShot(1000, &app, [&app, root, &qmlWarnings] {
         QVariant result;
@@ -100,13 +112,16 @@ int main(int argc, char **argv) {
                 verification->stop();
                 if (result.toInt() != 1) { app.exit(5); return; }
                 QTimer::singleShot(250, &app, [&app, root] {
+                    const auto window = qobject_cast<QQuickWindow *>(root);
                     const auto capture = qEnvironmentVariable("RCS_LINUX_CAPTURE_DIR");
                     if (!capture.isEmpty()) {
                         QDir().mkpath(capture);
-                        const auto window = qobject_cast<QQuickWindow *>(root);
                         if (!window || !window->grabWindow().save(capture + "/native-paired-home.png")) { app.exit(7); return; }
                     }
-                    app.exit(0);
+                    // Exercise the real main-window close path. Hidden popups
+                    // must not veto ending the UI, and the Rust agent survives.
+                    if (!window || !window->close()) { app.exit(9); return; }
+                    QTimer::singleShot(1000, &app, [&app] { app.exit(10); });
                 });
             }
         });

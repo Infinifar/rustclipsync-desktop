@@ -43,6 +43,7 @@ public:
     Q_INVOKABLE void searchHistory(const QString &query = {}, bool favorites = false, int offset = 0);
     Q_INVOKABLE void revealInbox();
     Q_INVOKABLE void hideInbox();
+    Q_INVOKABLE void exitUi();
     Q_INVOKABLE void testFilter(const QVariantMap &filter, const QString &text);
     Q_INVOKABLE QString stateLabel(const QString &state) const;
     Q_INVOKABLE QString receivedTime(qint64 seconds) const;

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run Linux native checks with a disposable clipboard, D-Bus and desktop keyring."""
 import os
+import hashlib
 from pathlib import Path
 import shutil
 import subprocess
@@ -23,6 +24,37 @@ def session():
     command = ([binary] if binary else ["cargo", "test", "--locked", "--test", "linux_native", "--"])
     command += ["--ignored", "--test-threads=1", "--nocapture"]
     subprocess.run(command, cwd=ROOT, check=True)
+    ui = os.environ.get("RCS_LINUX_UI_BINARY")
+    if ui:
+        verify_activation(ui)
+
+
+def verify_activation(ui):
+    """Exercise actual processes and the activation socket, including cold exit."""
+    with tempfile.TemporaryDirectory(prefix="rcs-ui-toggle-") as directory:
+        env = dict(os.environ, QT_QPA_PLATFORM="offscreen", QT_QPA_PLATFORMTHEME="generic", QT_QUICK_BACKEND="software")
+        for action in ("--inbox", "--history"):
+            profile = str(Path(directory) / action[2:])
+            fingerprint = hashlib.sha256(profile.encode()).hexdigest().upper()[:24]
+            socket = Path(env["XDG_RUNTIME_DIR"]) / "rustclipsync-desktop" / (fingerprint + ".ui")
+            arguments = [ui, "--data-dir", profile, action]
+            original = subprocess.Popen(arguments, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            try:
+                deadline = time.monotonic() + 10
+                while not socket.exists() and original.poll() is None and time.monotonic() < deadline:
+                    time.sleep(0.02)
+                if not socket.exists():
+                    raise RuntimeError("UI activation socket did not start")
+                redirected = subprocess.run(arguments, env=env, capture_output=True, text=True, timeout=10)
+                if redirected.returncode != 0:
+                    raise RuntimeError("UI activation failed: " + redirected.stderr)
+                if original.wait(timeout=10) != 0:
+                    raise RuntimeError("last shortcut window did not exit cleanly")
+                print(action + " process activation and close passed", flush=True)
+            finally:
+                if original.poll() is None:
+                    original.kill()
+                    original.wait()
 
 
 def main():

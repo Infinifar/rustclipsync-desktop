@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 
 ApplicationWindow {
-    id: window
+    id: mainWindow
     objectName: "mainWindow"
     title: "RustClipSync"
     width: initialWidth
@@ -27,7 +27,7 @@ ApplicationWindow {
     property var config: backend.status.config || ({})
     property var inbox: backend.status.inbox || ({})
     property bool activationOnly: initialAction !== "home"
-    function exitIfIdle() { if (activationOnly && !sensitive.visible && !historyWindow.visible) Qt.quit() }
+    function exitIfIdle() { if (activationOnly && !sensitive.visible && !historyWindow.visible) backend.exitUi() }
     property bool formInitialized: false
     function loadConnectionForm() {
         if (!online || formInitialized) return
@@ -41,8 +41,8 @@ ApplicationWindow {
     }
     Connections {
         target: backend
-        function onChanged() { window.loadConnectionForm() }
-        function onPaired() { window.formInitialized = false }
+        function onChanged() { mainWindow.loadConnectionForm() }
+        function onPaired() { mainWindow.formInitialized = false }
     }
     property bool online: !!backend.status.config
     function updateConfig(changes) {
@@ -61,11 +61,11 @@ ApplicationWindow {
         backend.hideInbox()
         if (action === "inbox") {
             if (sensitive.visible) sensitive.hide()
-            else { sensitive.show(); sensitive.raise(); sensitive.requestActivate(); if (!activationOnly) window.showMinimized() }
+            else { sensitive.show(); sensitive.raise(); sensitive.requestActivate(); if (!activationOnly) mainWindow.showMinimized() }
         } else if (action === "history") {
             if (historyWindow.visible) historyWindow.hide()
             else { historyWindow.show(); historyWindow.raise(); historyWindow.requestActivate(); historyPopup.reload() }
-        } else { activationOnly = false; window.showNormal(); window.raise(); window.requestActivate() }
+        } else { activationOnly = false; mainWindow.showNormal(); mainWindow.raise(); mainWindow.requestActivate() }
     }
     function smokeTest() {
         if (width < minimumWidth || tabs.count !== 4) return false
@@ -98,18 +98,18 @@ ApplicationWindow {
             if (!backend.inboxText) return 0
             if (backend.inboxText.indexOf("synthetic private fixture") !== 0) return -1
             backend.hideInbox()
-            window.activate("inbox")
+            mainWindow.activate("inbox")
             if (!sensitive.visible || backend.inboxText) return -1
             sensitive.pinned = true
             if (!(sensitive.flags & Qt.WindowStaysOnTopHint)) return -1
-            window.activate("inbox")
+            mainWindow.activate("inbox")
             if (sensitive.visible) return -1
-            window.activate("home")
-            window.activate("history")
+            mainWindow.activate("home")
+            mainWindow.activate("history")
             nativeStage = 3
         } else if (nativeStage === 3) {
             if (!historyWindow.visible || backend.historyTotal !== 1) return 0
-            window.activate("history")
+            mainWindow.activate("history")
             if (historyWindow.visible) return -1
             backend.autostart = true
             if (!backend.autostart) return -1
@@ -123,7 +123,7 @@ ApplicationWindow {
         return 0
     }
     onActiveChanged: if (!active && !sensitive.active) backend.hideInbox()
-    onClosing: { backend.hideInbox(); sensitive.hide(); historyWindow.hide(); Qt.quit() }
+    onClosing: { backend.hideInbox(); sensitive.hide(); historyWindow.hide(); backend.exitUi() }
 
     header: ColumnLayout {
         spacing: 8
@@ -142,13 +142,13 @@ ApplicationWindow {
             Layout.alignment: Qt.AlignHCenter
             Layout.topMargin: 8
             Layout.bottomMargin: 4
-            Layout.maximumWidth: window.width - 32
+            Layout.maximumWidth: mainWindow.width - 32
             currentIndex: initialPage
             onCurrentIndexChanged: backend.hideInbox()
-            TabButton { text: qsTr("主页"); width: Math.min(110, (window.width - 32) / 4) }
-            TabButton { text: qsTr("外观"); width: Math.min(110, (window.width - 32) / 4) }
-            TabButton { text: qsTr("快捷键"); width: Math.min(110, (window.width - 32) / 4) }
-            TabButton { text: qsTr("设置"); width: Math.min(110, (window.width - 32) / 4) }
+            TabButton { text: qsTr("主页"); width: Math.min(110, (mainWindow.width - 32) / 4) }
+            TabButton { text: qsTr("外观"); width: Math.min(110, (mainWindow.width - 32) / 4) }
+            TabButton { text: qsTr("快捷键"); width: Math.min(110, (mainWindow.width - 32) / 4) }
+            TabButton { text: qsTr("设置"); width: Math.min(110, (mainWindow.width - 32) / 4) }
         }
     }
     ColumnLayout {
@@ -178,7 +178,7 @@ ApplicationWindow {
                     anchors.margins: 24
                     Label {
                         text: backend.configured ? backend.stateLabel(backend.status.state || "") : qsTr("连接你的剪贴板")
-                        color: window.palette.highlight
+                        color: mainWindow.palette.highlight
                         font.pixelSize: 19 * backend.textScale
                         font.bold: true
                         Layout.fillWidth: true
@@ -213,7 +213,7 @@ ApplicationWindow {
                             RowLayout {
                                 Layout.fillWidth: true
                                 Label { text: qsTr("敏感收件区"); font.bold: true; Layout.fillWidth: true }
-                                Button { flat: true; text: qsTr("以小窗显示"); onClicked: window.activate("inbox") }
+                                Button { flat: true; text: qsTr("以小窗显示"); onClicked: mainWindow.activate("inbox") }
                             }
                             Label { text: !inbox.id ? qsTr("尚未收到敏感文本") : (backend.inboxText || "••••••••"); textFormat: Text.PlainText; wrapMode: Text.WrapAnywhere; Layout.fillWidth: true; maximumLineCount: 6; elide: Text.ElideRight }
                             Label { visible: !!inbox.id; text: qsTr("收到时间：%1").arg(backend.receivedTime(inbox.receivedAt || 0)); opacity: 0.7 }
@@ -337,15 +337,15 @@ ApplicationWindow {
             }
         }
     }
-    SensitiveWindow { id: sensitive; parentPalette: window.palette; onVisibleChanged: { if (!visible) { backend.hideInbox(); Qt.callLater(window.exitIfIdle) } } }
+    SensitiveWindow { id: sensitive; parentPalette: mainWindow.palette; onVisibleChanged: { if (!visible) { backend.hideInbox(); Qt.callLater(mainWindow.exitIfIdle) } } }
     ApplicationWindow {
         id: historyWindow
         title: qsTr("历史记录")
         width: 600; height: 640; minimumWidth: 420; minimumHeight: 360
         visible: false
-        palette: window.palette
-        font: window.font
-        onVisibleChanged: if (!visible) Qt.callLater(window.exitIfIdle)
+        palette: mainWindow.palette
+        font: mainWindow.font
+        onVisibleChanged: if (!visible) Qt.callLater(mainWindow.exitIfIdle)
         onClosing: function(close) { close.accepted = false; hide() }
         ScrollView {
             anchors.fill: parent; anchors.margins: 20
@@ -357,7 +357,7 @@ ApplicationWindow {
         id: quitDialog
         title: qsTr("退出同步后台？")
         implicitWidth: 420
-        width: Math.min(420, window.width - 48)
+        width: Math.min(420, mainWindow.width - 48)
         anchors.centerIn: Overlay.overlay
         modal: true
         standardButtons: Dialog.Ok | Dialog.Cancel
