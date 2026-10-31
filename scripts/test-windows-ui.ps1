@@ -37,6 +37,18 @@ function Save-Screen([string]$name) {
     $image.Save("$root/dist/installer/$name.png",[Drawing.Imaging.ImageFormat]::Png)
     $drawing.Dispose(); $image.Dispose()
 }
+function Assert-CenteredNavigation {
+    $items = @('NavHome','NavAppearance','NavShortcuts','NavSettings') | ForEach-Object { Get-Control $_ }
+    # All four fit at the supported test widths. A hidden/overflowed item is
+    # reported separately instead of accepting a misleading partial center.
+    foreach ($item in $items) {
+        if ($item.Current.IsOffscreen -or $item.Current.BoundingRectangle.Width -le 0) { throw 'Navigation item not visible at test width' }
+    }
+    $left = ($items | ForEach-Object { $_.Current.BoundingRectangle.Left } | Measure-Object -Minimum).Minimum
+    $right = ($items | ForEach-Object { $_.Current.BoundingRectangle.Right } | Measure-Object -Maximum).Maximum
+    $bounds = $script:window.Current.BoundingRectangle
+    if ([Math]::Abs(($left+$right)/2 - ($bounds.Left+$bounds.Right)/2) -gt 8) { throw 'Top navigation group is not centered' }
+}
 $script:window = [System.Windows.Automation.AutomationElement]::FromHandle($ui.MainWindowHandle)
 Invoke-Control NavAppearance
 Select-Combo ThemeChoice '深色'
@@ -44,6 +56,7 @@ Select-Combo FontChoice '大'
 $appearance = Get-Content "$env:LOCALAPPDATA/RustClipSync/appearance.json" -Raw | ConvertFrom-Json
 if ($appearance.theme -ne 'dark' -or $appearance.fontSize -ne 18) { throw 'Appearance choice was not saved' }
 Save-Screen 'appearance-dark'
+Assert-CenteredNavigation
 Invoke-Control NavSettings
 $startup = Join-Path ([Environment]::GetFolderPath('Startup')) 'RustClipSync.lnk'
 if (Test-Path $startup) { throw 'Unexpected existing startup entry in disposable runner' }
@@ -81,6 +94,7 @@ public static class ResizeTestWindow { [DllImport("user32.dll")] [return:Marshal
 $original = $script:window.Current.BoundingRectangle
 if (![ResizeTestWindow]::SetWindowPos($ui.MainWindowHandle,[IntPtr]::Zero,0,0,520,700,6)) { throw 'Cannot resize test window' }
 Start-Sleep -Milliseconds 600
+Assert-CenteredNavigation
 foreach ($id in @('PushNow','PullNow','PauseSync')) {
     $bounds = (Get-Control $id).Current.BoundingRectangle
     $container = $script:window.Current.BoundingRectangle

@@ -99,6 +99,31 @@ public sealed partial class MainWindow : Window
         var dialog = new ContentDialog { XamlRoot = Root.XamlRoot, Title = title, Content = message, PrimaryButtonText = action, CloseButtonText = "取消", DefaultButton = ContentDialogButton.Close, RequestedTheme = Root.RequestedTheme };
         return await dialog.ShowAsync() == ContentDialogResult.Primary;
     }
+    private void Navigation_Loaded(object sender, RoutedEventArgs e)
+    {
+        // Keep the stock NavigationView and its overflow behavior. Only its
+        // top menu strip should shrink to its content and sit in the center;
+        // the page content must continue stretching to the window width.
+        Navigation.ApplyTemplate();
+        static Grid? FindTopGrid(DependencyObject parent)
+        {
+            if (parent is Grid grid && grid.Name == "TopNavGrid") return grid;
+            for (var i = 0; i < Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(parent); i++)
+            {
+                var found = FindTopGrid(Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(parent, i));
+                if (found is not null) return found;
+            }
+            return null;
+        }
+        if (FindTopGrid(Navigation) is not { } topGrid) return;
+        topGrid.HorizontalAlignment = HorizontalAlignment.Center;
+        foreach (var column in topGrid.ColumnDefinitions)
+        {
+            if (!column.Width.IsStar) continue;
+            column.MinWidth = 0;
+            column.Width = GridLength.Auto;
+        }
+    }
     private void Navigation_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
         if (HomePage is null || AppearancePage is null || SettingsPage is null || ShortcutsPage is null) return;
