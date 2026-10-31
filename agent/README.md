@@ -39,7 +39,7 @@ cargo clippy --locked --all-targets -- -D warnings
 cargo build --locked --release --bin rustclipsync-agent
 ```
 
-日常使用完整 `RustClipSync-0.2.1-setup-x64.exe` 安装包与 WinUI 设置页面。无参数双击后台时打开同目录的 WinUI；单独复制后台文件会显示用途提示。
+日常使用完整 `RustClipSync-0.2.2-setup-x64.exe` 安装包与 WinUI 设置页面。无参数双击后台时打开同目录的 WinUI；单独复制后台文件会显示用途提示。
 
 开发时可独立运行：
 

@@ -91,7 +91,7 @@ Windows 依赖版本见 [NuGet 锁文件](ui/RustClipSync/packages.lock.json)，
 | ring | 0.17.14 | Apache-2.0 AND ISC |
 | rustc-hash | 2.1.3 | Apache-2.0 OR MIT |
 | rustc_version | 0.4.1 | MIT OR Apache-2.0 |
-| rustclipsync-agent | 0.2.1 | MIT |
+| rustclipsync-agent | 0.2.2 | MIT |
 | rustclipsync-core | 0.2.0 | MIT |
 | rustix | 1.1.6 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
 | rustls | 0.23.46 | Apache-2.0 OR ISC OR MIT |
