@@ -5,7 +5,7 @@ use rustclipsync_core::{
     MAX_TEXT_BYTES,
 };
 use std::{
-    cell::Cell,
+    cell::{Cell, RefCell},
     io, mem, ptr, thread,
     time::{Duration, Instant},
 };
@@ -51,7 +51,7 @@ pub struct WindowsClipboard {
     formats: Formats,
     expected: Cell<Option<u32>>,
     observed: Cell<Option<u32>>,
-    written: Cell<Option<u32>>,
+    written: RefCell<Option<String>>,
 }
 impl WindowsClipboard {
     pub fn new(hwnd: usize, formats: Formats) -> Self {
@@ -60,7 +60,7 @@ impl WindowsClipboard {
             formats,
             expected: Cell::new(None),
             observed: Cell::new(None),
-            written: Cell::new(None),
+            written: RefCell::new(None),
         }
     }
     pub fn observe(&self, allow_sensitive: bool) -> Result<Observation, ClipboardError> {
@@ -68,10 +68,29 @@ impl WindowsClipboard {
             let _lease = Lease::open(self.hwnd as HWND)?;
             let sequence = GetClipboardSequenceNumber();
             self.expected.set(Some(sequence));
-            if self.written.get() == Some(sequence) || self.observed.get() == Some(sequence) {
+            if self.observed.get() == Some(sequence) {
                 return Ok(Observation {
                     value: None,
                     marker: None,
+                    unchanged: true,
+                });
+            }
+            let marker = self.marker()?;
+            // Windows can advance the sequence when CloseClipboard completes.
+            // Match the owner HWND and our unique origin marker under the lease,
+            // then remember the final observed sequence for duplicate notices.
+            let own = GetClipboardOwner() == self.hwnd as HWND
+                && self
+                    .written
+                    .borrow()
+                    .as_deref()
+                    .is_some_and(|id| marker.as_deref() == Some(id));
+            self.written.take();
+            if own {
+                self.observed.set(Some(sequence));
+                return Ok(Observation {
+                    value: None,
+                    marker,
                     unchanged: true,
                 });
             }
@@ -90,16 +109,6 @@ impl WindowsClipboard {
                 });
             }
             let text = read_text()?;
-            let marker = if IsClipboardFormatAvailable(self.formats.origin) != 0 {
-                let bytes = read_bytes(self.formats.origin, 64)?;
-                bytes
-                    .iter()
-                    .position(|b| *b == 0)
-                    .and_then(|end| std::str::from_utf8(&bytes[..end]).ok())
-                    .map(str::to_owned)
-            } else {
-                None
-            };
             self.observed.set(Some(sequence));
             Ok(Observation {
                 value: Some((text, sensitive)),
@@ -108,6 +117,17 @@ impl WindowsClipboard {
             })
         }
     }
+    unsafe fn marker(&self) -> Result<Option<String>, ClipboardError> {
+        if IsClipboardFormatAvailable(self.formats.origin) == 0 {
+            return Ok(None);
+        }
+        let bytes = read_bytes(self.formats.origin, 64)?;
+        Ok(bytes
+            .iter()
+            .position(|b| *b == 0)
+            .and_then(|end| std::str::from_utf8(&bytes[..end]).ok())
+            .map(str::to_owned))
+    }
 }
 impl Clipboard for WindowsClipboard {
     fn snapshot(&self, allow: bool) -> Result<Option<(String, bool)>, ClipboardError> {
@@ -115,7 +135,7 @@ impl Clipboard for WindowsClipboard {
         let saved = self.written.take();
         let observed = self.observed.take();
         let value = self.observe(allow).map(|v| v.value);
-        self.written.set(saved);
+        self.written.replace(saved);
         self.observed.set(observed);
         value
     }
@@ -152,7 +172,7 @@ impl Clipboard for WindowsClipboard {
             // Publish the marker first. Partial writes are never reported applied.
             marker.publish(self.formats.origin)?;
             content.publish(CF_UNICODETEXT)?;
-            self.written.set(Some(GetClipboardSequenceNumber()));
+            self.written.replace(Some(message_id.to_owned()));
             Ok(())
         }
     }
