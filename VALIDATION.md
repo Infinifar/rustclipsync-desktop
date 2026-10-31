@@ -34,6 +34,8 @@ Windows 原生 IPC 测试启动真实后台，验证当前登录会话通道、�
 
 本轮关闭窗口验证记录实际退出码 0，配对界面关闭后恰有一个后台进程继续存活；主题、字号、自启和真实配置写入均通过 UI Automation 验证。
 
+[最终安装复验 41207473083](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41207473083) 使用同一已校验安装包再次通过全部 UI 与卸载测试，也验证了测试工具的临时目录隔离限制。加载稳定后的配对窗口截图已目视检查，标题、图标、敏感遮罩、控件与深色标题栏均正常。
+
 ## 设计依据与实际限制
 
 本轮已安装并使用 [OpenAI 官方 winui-app 技能](https://github.com/openai/skills/tree/main/skills/.curated/winui-app)，按其原生导航、控件、主题、响应式布局与实际启动验证指导进行检查；主操作排列遵循用户指定的 Omaclipsync 布局。
