@@ -56,6 +56,7 @@ Save-Screen 'settings-startup'
 $toggle.Toggle(); Start-Sleep -Milliseconds 400
 if (Test-Path $startup) { throw 'UI did not remove startup shortcut when disabled' }
 Invoke-Control NavHome
+Save-Screen 'home-dark'
 foreach ($id in @('PushNow','PullNow','PauseSync','SyncDirection')) {
     $control = Get-Control $id
     $bounds = $control.Current.BoundingRectangle

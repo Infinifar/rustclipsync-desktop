@@ -36,6 +36,7 @@ public sealed partial class MainWindow : Window
         ReadConfig(); LoadForm(); ReadStartup(); Navigation.SelectedItem = HomeNav;
         Root.Loaded += async (_, _) =>
         {
+            if (initialized) return;
             initialized = true;
             SetMinimumWindowSize(Root.XamlRoot.RasterizationScale);
             var minimumScale = Root.XamlRoot.RasterizationScale;

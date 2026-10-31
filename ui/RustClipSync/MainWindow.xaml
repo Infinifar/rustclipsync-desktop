@@ -19,7 +19,7 @@
     <NavigationViewItem x:Name="SettingsNav" Content="设置" Icon="Setting" Tag="settings" AutomationProperties.AutomationId="NavSettings"/>
    </NavigationView.MenuItems>
    <ScrollViewer x:Name="PageScroll" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Top" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-    <Grid Padding="24,16,24,24" MaxWidth="840" HorizontalAlignment="Stretch" RowSpacing="16">
+    <Grid Padding="24,16,24,24" Width="{Binding ElementName=PageScroll, Path=ViewportWidth}" MaxWidth="840" HorizontalAlignment="Center" RowSpacing="16">
      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
      <InfoBar x:Name="Notice" IsOpen="False" IsClosable="True" Severity="Informational"/>
      <Grid Grid.Row="1">
