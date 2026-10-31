@@ -59,6 +59,8 @@
 
 配置新增可选布尔字段 `autoApplySensitive`（默认 false）。只有与 `allowSensitive` 同时为 true 时才自动写入之后收到的敏感文本；设置更新不补写旧收件项，不重置游标或设备身份。旧配置缺少该字段时保持手动收件行为。它随 `getStatus.config` 返回，经 `updateSettings` 原子保存并立即应用。
 
+敏感收件项复制始终使用 `copyInbox`，由 Rust 写入原消息 ID 与敏感/排除标记，不能改用普通历史复制或在 C# 中直接写剪贴板。`clearInbox` 只修改本机加密收件项，不改变接收游标，不调用服务端删除接口，也不清空系统剪贴板。
+
 首次配对仍使用专用 `pair --password-stdin` 子进程。账户密码不进入通用状态通道，不落盘；重新配对必须经 UI 明确确认。主题/字号为独立的非敏感界面偏好；自启设置直接管理经过目标验证的当前用户 `.lnk`，与同步配置分开。
 
 固定错误码包括 `invalid_request`、`invalid_filter`、`busy`、`settings_changed`、`storage_error`、`history_error`、`credentials`、`conflict`、`expired`、`re_pair`、`clipboard_error`、`operation_unconfirmed` 和 `needs_restart`。不透传底层 HTTP/正文错误字符串。
