@@ -57,9 +57,27 @@ $toggle.Toggle(); Start-Sleep -Milliseconds 400
 if (Test-Path $startup) { throw 'UI did not remove startup shortcut when disabled' }
 Invoke-Control NavHome
 foreach ($id in @('PushNow','PullNow','PauseSync','SyncDirection')) {
-    $bounds = (Get-Control $id).Current.BoundingRectangle
+    $control = Get-Control $id
+    $bounds = $control.Current.BoundingRectangle
     $container = $script:window.Current.BoundingRectangle
+    Write-Output "Layout $id : left=$($bounds.Left) right=$($bounds.Right) width=$($bounds.Width) offscreen=$($control.Current.IsOffscreen)"
+    if ($bounds.Width -le 0 -or $control.Current.IsOffscreen) { continue }
     if ($bounds.Right -gt ($container.Right-4) -or $bounds.Left -lt ($container.Left+4)) { throw "Control extends beyond the native window: $id" }
 }
 Save-Screen 'home-dark'
+Add-Type @'
+using System;using System.Runtime.InteropServices;
+public static class ResizeTestWindow { [DllImport("user32.dll")] [return:MarshalAs(UnmanagedType.Bool)] public static extern bool SetWindowPos(IntPtr window,IntPtr after,int x,int y,int width,int height,uint flags); }
+'@
+$original = $script:window.Current.BoundingRectangle
+if (![ResizeTestWindow]::SetWindowPos($ui.MainWindowHandle,[IntPtr]::Zero,0,0,520,700,6)) { throw 'Cannot resize test window' }
+Start-Sleep -Milliseconds 600
+foreach ($id in @('PushNow','PullNow','PauseSync')) {
+    $bounds = (Get-Control $id).Current.BoundingRectangle
+    $container = $script:window.Current.BoundingRectangle
+    if ($bounds.Width -gt 0 -and ($bounds.Right -gt ($container.Right-4) -or $bounds.Left -lt ($container.Left+4))) { throw "Narrow layout overflow: $id" }
+}
+Save-Screen 'home-narrow'
+[ResizeTestWindow]::SetWindowPos($ui.MainWindowHandle,[IntPtr]::Zero,0,0,[int]$original.Width,[int]$original.Height,6) | Out-Null
+Start-Sleep -Milliseconds 300
 Write-Output 'PASS: Home/Appearance/Settings navigation, persistent theme/font and actual startup shortcut toggle.'

@@ -23,8 +23,10 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
         var area = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(AppWindow.Id, Microsoft.UI.Windowing.DisplayAreaFallback.Primary).WorkArea;
-        var width = Math.Min(860, area.Width); var height = Math.Min(820, area.Height);
+        var scale = Math.Max(1, GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(this)) / 96.0);
+        var width = Math.Min((int)(860 * scale), area.Width); var height = Math.Min((int)(820 * scale), area.Height);
         AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(area.X + (area.Width-width)/2, area.Y + (area.Height-height)/2, width, height));
+        SetMinimumWindowSize(scale);
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "rustclipsync.ico"));
         try { appearance = AppearanceSettings.Load(); } catch { Show("外观设置无法读取", "暂时采用系统主题。可以在外观页重新保存。", InfoBarSeverity.Warning); }
         ThemeChoice.SelectedIndex = appearance.Theme == "dark" ? 2 : appearance.Theme == "light" ? 1 : 0;
@@ -35,12 +37,23 @@ public sealed partial class MainWindow : Window
         Root.Loaded += async (_, _) =>
         {
             initialized = true;
+            SetMinimumWindowSize(Root.XamlRoot.RasterizationScale);
+            Root.XamlRoot.Changed += (_, _) => SetMinimumWindowSize(Root.XamlRoot.RasterizationScale);
             if (config is not null) { try { AgentClient.Start(); } catch { Show("无法启动后台", "请确认完整安装了 RustClipSync。", InfoBarSeverity.Error); } }
             await Refresh(); timer.Start();
         };
         timer.Tick += async (_, _) => { if (!busy && !agent.IsBusy && !closed) await Refresh(); };
         Closed += (_, _) => { closed = true; timer.Stop(); agent.Close(); };
     }
+    private void SetMinimumWindowSize(double scale)
+    {
+        if (AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter)
+        {
+            presenter.PreferredMinimumWidth = (int)Math.Ceiling(480 * scale);
+            presenter.PreferredMinimumHeight = (int)Math.Ceiling(420 * scale);
+        }
+    }
+    [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr window);
     private void Show(string title, string message, InfoBarSeverity severity = InfoBarSeverity.Informational)
     { if (closed) return; Notice.Title = title; Notice.Message = message; Notice.Severity = severity; Notice.IsOpen = true; }
     private void Error(Exception error)
@@ -84,6 +97,10 @@ public sealed partial class MainWindow : Window
         SettingsPage.Visibility = page == "settings" ? Visibility.Visible : Visibility.Collapsed;
         if (page == "settings" && initialized) { LoadForm(); ReadStartup(); }
         if (page != "settings") PasswordBox.Password = "";
+        if (initialized) DispatcherQueue.TryEnqueue(() => {
+            PageScroll.ChangeView(null, 0, null, true);
+            if (Notice.Severity is InfoBarSeverity.Success or InfoBarSeverity.Informational) Notice.IsOpen = false;
+        });
     }
     private void OpenSettings_Click(object sender, RoutedEventArgs e) => Navigation.SelectedItem = SettingsNav;
     private void ReadConfig()
