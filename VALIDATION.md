@@ -1,76 +1,52 @@
-# Windows 客户端验证
+# Windows 0.2.0 验证
 
-日期：2026-10-31。开发主机为 Linux x86_64；系统 Rust/Cargo 1.99.1。
+日期：2026-10-31。源码开发主机为 Linux x86_64；Windows 构建、实际窗口和截图来自 GitHub Actions 的临时 Windows Server 2025 x64 / VS 2026 虚拟机。未连接或操作 dot（Expert）远程电脑。
 
-## 本机已通过
+## 已通过的检查
 
-| 检查 | 结果 |
+| 检查 | 结果与范围 |
 | --- | --- |
-| `cargo test --locked` | 10 项通过：agent 的 URL/凭据字段、UTF-16/UTF-8 限长和匿名管道密码输入 6 项，共享快照内模块测试 4 项 |
-| `cargo clippy --locked --features check-windows --all-targets -- -D warnings` | 通过；包括全部 Win32 适配代码与原生测试的类型检查 |
-| `cargo fmt --all -- --check` | 通过 |
-| 独立共享核心快照校验 | 所有文件与 UPSTREAM.json 的 SHA-256 一致，未修改消费端快照 |
-| 本地项目依赖 | 仅使用仓库内导出源码和锁定的 registry 依赖，可独立检出构建 |
+| Linux `cargo test --locked` | agent 的配置迁移、过滤范围、匿名密码输入、历史加密/清理和 IPC 契约 10 项；共享快照内模块 4 项 |
+| Linux Win32 类型检查 | `cargo clippy --locked --features check-windows --all-targets -- -D warnings` 通过，包含原生适配与 Windows 测试 |
+| 独立共享核心 | [Core CI 41201673704](https://github.com/Infinifar/rustclipsync-core/actions/runs/41201673704) 的 Windows / Ubuntu 各 22 项测试、格式与 Clippy 均通过 |
+| 真实 HTTPS 回归 | 使用临时服务端、独立数据库与临时证书，通过注册、离线最后值、幂等重试、清空/重启不重放、回环抑制、敏感策略与冲突检查 |
+| Windows 原生 | DPAPI、私有 ACL、原子替换、排他锁、限长、匿名密码管道、敏感历史排除；另在一次性会话执行真实剪贴板与 IPC 控制测试 |
+| 首轮完整 UI | [CI 41202306906](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41202306906) 通过三页导航、主题/字号保存、真实启动项创建/删除、安装、图标、启动和卸载 |
+| 后续视觉检查 | 实际截图检查并修复大字号的横向裁切；暗色标题栏、滚动视口宽度与窄窗口布局已检查 |
 
-`check-windows` 在 Linux 上只用于编译检查，不执行 Windows API，不生成 Windows 可运行文件。共享核心之前完成的真实 HTTPS/状态迁移测试不计入本阶段新增 Windows 实机结果。
+共享核心新增测试覆盖：私有敏感正文与游标同次加密提交、skipped 确认、保存失败不确认/不写剪贴板、重启不重放、通知身份无正文、按 ID 删除收件项。旧 Omaclipsync 状态迁移测试继续通过。
 
-## GitHub Windows 原生验证已通过
+Windows 原生 IPC 测试启动真实后台，验证当前登录会话通道、脱敏状态、配置更新及版本冲突、过滤规则和退出；确认设备 ID、游标和加密收件项保留，状态不包含令牌或正文。历史测试确认敏感内容不会进入普通加密历史。
 
-[Windows 客户端 CI 41191068330](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41191068330) 在提交 `f9f35a74dcf2458a55af3f4178a4a8a9a874ce24` 上全部通过，使用 GitHub 临时 Windows Server 2025 x64 / VS 2026 runner 与 Rust 1.99.1 MSVC；Ubuntu 作业同时通过。
+## 完整配对后 UI 验证
 
-- Windows 默认测试 14 项通过：agent 逻辑 4 项、DPAPI/存储/权限/锁 6 项、内嵌共享模块 4 项。
-- 真实剪贴板测试在 `RCS_WINDOWS_DISPOSABLE=1` 的临时 runner 显式执行，1 项通过：来源标记、自身写入和重复通知过滤，以及拒绝过期序号覆盖。
-- 格式检查、Clippy、共享源码哈希检查、MSVC release 构建均通过。
-- 构建产物 `rustclipsync-agent-windows-x64-development` 已上传为 [artifact 13038334662](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41191068330/artifacts/13038334662)，是未签名的开发构建。
-- 二进制已下载到本地 `dist/windows-x64/rustclipsync-agent.exe`，同目录保存 SHA256SUMS。
+[最终 CI 41206349593](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41206349593) 在提交 `f8bc96fafea09d831d7226ad3c9d40d353673b91` 上 Windows 与 Ubuntu 作业全部通过。Windows 默认 22 项测试、真实剪贴板 1 项、真实管道 1 项，以及以下实际 UI 检查均通过：
 
-本轮原生验证修复了两处平台差异：源码快照校验统一使用 POSIX 相对路径，Git 强制文本 LF；自身写入确认改为在剪贴板锁内核对 owner HWND 和唯一消息标记，再记下最终观察到的序号，避免关闭剪贴板时序号变化导致误判。
+- 从 0.1.0 形式的旧配置、DPAPI 密钥及 RCS1 状态启动，不要求重新配对。
+- WinUI 通过真实管道读取“已暂停”与设备状态；UI 自动化树不包含敏感正文。
+- 主题和字号在退出/重新打开后保留。
+- UI 暂停/恢复实际改变后台配置；保存历史设置由后台验证和原子提交。
+- 窗口关闭干净退出，恰好一个 Rust 后台继续存活；随后明确退出后台。
+- 宽窗口与 520 像素窄窗口的主要操作保持在窗口边界内，保留截图。
+- 安装后 EXE 图标与 Omaclipsync ICO 逐像素相同，卸载移除程序和自启入口，保留用户数据。
 
-共享核心本身另通过 [Windows / Ubuntu 的 20 项完整测试及 Clippy](https://github.com/Infinifar/rustclipsync-core/actions/runs/41190778425)，不是只运行消费端快照内的 4 项模块测试。
+安装包与截图：[Windows x64 0.2.0 产物](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41206349593/artifacts/13044905561)。已下载到本机 `dist/windows-0.2.0/`，并核对 SHA256SUMS；安装器 SHA-256 为 `9147a0c31c186154a2ea185a243781abb1c88b98f15206512b9e6b81b64c4298`，大小 67,806,308 字节。
 
-早期本机交叉检查曾因缺少完整 Visual C++ CRT 头而受限；本次已由 GitHub 的真实 Windows MSVC 环境完成原生编译、测试和 release 产物生成。Windows Server runner 的测试不等于下面所有 Windows 11 日常桌面场景都已验收。
+本轮关闭窗口验证记录实际退出码 0，配对界面关闭后恰有一个后台进程继续存活；主题、字号、自启和真实配置写入均通过 UI Automation 验证。
 
-## 实机检查清单
+## 设计依据与实际限制
 
-- 在 Windows 11 x64 临时用户/VM 中执行默认测试与专用剪贴板测试。
-- 配对临时服务端，确认密码不写盘；退出后以空账户密码的日常 Client 恢复 token 同步。
-- 确认启动不上传旧剪贴板，A→B→A 正常、远端写入不回环，清空/重启不重放，离线复制只同步最后一条。
-- 让其他进程占用剪贴板，验证有限重试、暂时读错误恢复，以及下载期间本地复制不会被覆盖。
-- 验证标记敏感内容默认过滤，空/非文本/非法 UTF-16、10 MiB 文本与超限内容的行为。
-- 测试暂停/恢复、Explorer 重启、睡眠/恢复、RDP 同会话重连、同用户另一会话争用锁，以及托盘退出。
-- 测试磁盘满、权限错误、状态篡改、断电/强杀，确认停同步且没有新建身份掩盖错误。
-- 测试网络响应丢失、409、410、设备撤销；当前冲突/存储错误通过固定状态提示并停止自动同步。
-- 最后进行资源、延迟与持续运行测量。本轮没有 Windows 性能数值或签名安装包。
+本轮已安装并使用 [OpenAI 官方 winui-app 技能](https://github.com/openai/skills/tree/main/skills/.curated/winui-app)，按其原生导航、控件、主题、响应式布局与实际启动验证指导进行检查；主操作排列遵循用户指定的 Omaclipsync 布局。
 
-当前已增加 WinUI 首次配置窗口与按用户的 EXE 安装器，包含开始菜单、可选桌面快捷方式和可选登录启动。完整 Named Pipe、私有敏感收件箱、长期历史、四页设置和 MSIX 仍按开发计划推进。
+采用原生 NavigationView、Expander、ListView、ToggleSwitch、NumberBox、ContentDialog、InfoBar 等控件；主题使用系统资源，无额外 UI 组件库。窗口最小有效宽度为 480，初始尺寸和最小尺寸考虑 DPI，目录与同步逻辑由独立后台承担。
 
-## 实现依据
+Windows Server CI 不等于所有 Windows 11 日常场景均完成验收。用户已确认 0.1.0 的真实 Windows 安装和推送成功；0.2.0 的日常三端持续同步、RDP/睡眠/多屏 DPI、高对比和 Narrator、异常断电恢复及 24 小时资源测量仍需单独实机验收。本轮不提供未经测量的 Windows 内存或延迟数值，安装包仍未签名。
 
-- [SetClipboardData：内存所有权与有效 owner 窗口](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setclipboarddata)
-- [AddClipboardFormatListener：剪贴板更新通知](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-addclipboardformatlistener)
-- [MoveFileExW：同目录替换和 write-through 标志](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexw)
-- [CryptProtectData：当前用户 DPAPI](https://learn.microsoft.com/en-us/windows/win32/api/dpapi/nf-dpapi-cryptprotectdata)
+## 排查过程中已修复的问题
 
-以上 API 文档不构成对本应用运行正确性或断电行为的实机验证。
+- 管道响应写入后过早断开会丢弃未读缓冲；现在读取单字节传输收据后断开，I/O 有截止时间。
+- 页面内容在大字号下按期望宽度扩展，导致右侧裁切；现在绑定实际滚动视口宽度并进行边界检查。
+- 配置更新检查过期 revision，历史清理不重置同步身份；历史变更序号让同一秒的连续复制和自动清理也能更新列表。
+- 进程退出码验证保留真实进程句柄，避免仅按 PID 查询在退出后丢失 ExitCode。
 
-## 首次安装与图标修复
-
-旧版产物只有 Rust 后台 EXE；无参数时向隐藏的标准输出打印帮助后退出，没有安装向导或设置窗口，也没有嵌入应用图标。这解释了双击无反应和没有图标的现象。
-
-本次加入 WinUI 3 / .NET 10 首次配置窗口和 Inno Setup 按用户安装器，图标直接复用 Omaclipsync 的 SVG 并导出 PNG/ICO。后台无参数启动时转到相邻的 WinUI 程序；缺少界面组件时显示明确提示。安装包包含 .NET、Windows App SDK 2.6.4 和应用本地 C++ 运行组件。
-
-Windows 原生测试已扩展到默认 17 项与专用剪贴板 1 项；新增 GUI 子进程匿名标准输入测试，覆盖真实 Win32 无控制台密码传输、Unicode 和失败时不保存配置。嵌入图标检查比较实际交付 EXE 与原始 ICO 的像素。
-
-早期安装验证实际发现并阻止交付了资源加载失败的构建：WinUI 编译通过，但发布目录缺少应用 XAML 资源。SDK 在启用 WinUI 构建工具后已生成包含应用与控件主题的 `RustClipSync.pri`；构建脚本将该完整索引以未打包运行时需要的 `resources.pri` 名称发布，并检查 MainWindow 与主题 XBF 条目。
-
-[安装复验 41197073934](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41197073934) 已通过按用户安装、实际 EXE 图标像素比较、无参数双击打开原生 WinUI 窗口、截图与卸载。复验使用提交 `6f27033` 构建的安装包、提交 `8d830d2` 的校验脚本。实际截图已下载并目视检查：中文标签、同款图标、原生输入框与按钮均正常，没有启动错误。
-
-测试脚本还修正了 Windows 路径字符串混用斜杠，导致有窗口时仍无法识别进程的问题。
-
-[完整 Windows/Ubuntu CI 41197072246](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41197072246) 已在提交 `8d830d209f0aa24863e59fb62635c82d8e66fc47` 上全部通过：Windows 默认 17 项与真实剪贴板 1 项、格式/Clippy/共享源码校验、Rust release、WinUI 自带运行组件构建、安装/图标/窗口/卸载均成功；Ubuntu 的 10 项测试和 Clippy 同时通过。
-
-最终安装包、SHA256SUMS 与实际首次运行截图见 [Windows x64 安装产物](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41197072246/artifacts/13041411062)。已下载到本地 `dist/installer/`，安装器为 `RustClipSync-0.1.0-setup-x64.exe`。这是未签名的开发安装包。
-
-Windows 11 日常双向同步、完整托盘交互、升级、长时间运行和代码签名仍需单独验收。
-
-资源发布依据：[微软未打包应用资源流程](https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/mrtcore/localize-strings#loading-strings-in-unpackaged-applications)。
+源码导出、格式、Clippy 与安装检查由 CI 执行，导出快照全部文件有 SHA-256 校验。

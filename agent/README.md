@@ -1,86 +1,104 @@
 # Windows Rust 后台
 
-`rustclipsync-agent` 是普通用户会话进程，复用 `rustclipsync-core`。当前可独立配对、运行同步并通过系统托盘暂停/退出。已接入 WinUI 首次配置窗口与安装器；完整 Named Pipe 控制协议仍待后续实现。
+`rustclipsync-agent` 是普通用户会话进程，复用 `rustclipsync-core` 0.2.0。同步、剪贴板、状态/历史加密、游标与本地控制由 Rust 负责；WinUI 窗口关闭后，后台独立运行。
 
-## 已实现
+## 功能与数据
 
-- 隐藏 Win32 窗口监听 `WM_CLIPBOARDUPDATE`；本地事件合并为当前最后一条，不上传启动前已有的剪贴板。
-- `CF_UNICODETEXT` 有界 UTF-16/UTF-8 转换，正文最大 10 MiB，不创建整份中间文本副本。相同剪贴板序号的重复通知不创建新消息。
-- 写入携带私有消息 ID，抑制本机回声；取得剪贴板锁后再次检查序号，拒绝覆盖新复制。占用时单次重试最多约 200 ms，读失败后继续等待/重试。
-- HTTPS 校验证书、设备 token、长轮询和断网退避；重试 UUID、离线最后值、游标和应用日志由共享核心处理。
-- DPAPI CurrentUser 保护随机状态密钥；AES-256-GCM 加密设备身份与待发送文本；目录/文件使用当前用户专用的受保护 DACL。
-- 同目录随机临时文件、内容 flush 与 write-through 替换；状态损坏、密钥缺失及存储失败停同步，不静默建立新设备身份。
-- 持有跨登录会话有效的排他文件句柄，防止两个 agent 写同一配置；退出时停止新操作、保留持久状态并等待当前同步批次返回。
+- 隐藏 Win32 窗口与 `WM_CLIPBOARDUPDATE`，不上传启动前已有的剪贴板；相同序号的通知不生成新消息。
+- `CF_UNICODETEXT` 有界转换，文本同步上限 10 MiB。写入携带消息 ID；在剪贴板锁内复查序号，拒绝覆盖刚发生的本机复制。
+- HTTPS 设备令牌、长轮询、断网退避、相同 UUID 重试、离线最后值、持久化游标和 applying 日志。
+- 当前用户 DPAPI 保护随机主密钥；AES-256-GCM 保存令牌、待办、游标和私有收件项。普通历史独立加密，排除敏感正文。
+- 当前用户文件 DACL、同目录临时文件、flush 与 write-through 原子替换；状态损坏或密钥缺失停同步，不重建身份掩盖错误。
+- 跨登录会话排他文件锁；Logon SID / 会话 / 安装位置检查的本机 Named Pipe，详见 [IPC.md](../IPC.md)。
 
-## Windows 构建
+目录为 `%LOCALAPPDATA%\RustClipSync\`：
 
-使用 Visual Studio 的 **Desktop development with C++** 工具和 Windows SDK，以及 Rust MSVC。CI 固定 Rust 1.99.1，开发目标为 Windows 11 x64：
+| 文件 | 内容 |
+| --- | --- |
+| config.json | 地址、账户、方向、暂停、敏感/过滤/历史策略；无密码和令牌 |
+| appearance.json | 主题与字号，不含同步数据 |
+| `<identity>.key.dpapi` | DPAPI 保护的主密钥 |
+| `<identity>.state` | RCS1 加密状态，包含游标、设备令牌、有界 outbox 和最后一个私有收件项 |
+| `<identity>.history` | RCH1 加密普通历史与收藏，密钥由主密钥按用途派生 |
+| agent.lock | 排他锁，随句柄释放 |
+| diagnostics.json | 用户主动导出的固定状态和版本，无正文、密码、令牌和过滤规则 |
+
+`identity` 由规范化服务端地址与区分大小写的账户名计算。已有 0.1.0 配置与加密状态可直接读取。切换服务器/账户使用不同的加密文件，旧文件不自动删除。自动清理作用于当前配对，后台停止时不会执行清理；卸载保留数据目录。
+
+历史默认关闭，开启后默认普通记录 50 条 / 7 天，可设置条数与期限；收藏最多 50 条，手动删除前保留。单条历史最多 1 MiB，总正文最多 16 MiB。历史错误不回滚已完成的同步。清空历史不改变游标、设备身份或私有收件项。
+
+敏感同步默认关闭。开启后，敏感接收只进入加密收件区，消费游标与正文同次提交，ack 为 skipped；不会自动调用系统剪贴板写入。用户明确复制时才写入，并附带 Windows 历史/云同步排除标记。并非所有应用都提供敏感标记，这些措施不能识别全部敏感信息。
+
+## 构建与运行
+
+Windows 11 x64，Visual Studio C++ 工具和 Windows SDK，Rust 1.99.1 MSVC：
 
 ```powershell
-rustup toolchain install 1.99.1 --profile minimal --component clippy,rustfmt
-rustup override set 1.99.1
 cargo test --locked -- --test-threads=1
 cargo clippy --locked --all-targets -- -D warnings
 cargo build --locked --release --bin rustclipsync-agent
 ```
 
-产物是 `target\release\rustclipsync-agent.exe`，开发构建尚未签名。普通运行使用 Windows GUI 子系统，不显示常驻控制台。配对命令连接父控制台；PowerShell 用 `Start-Process -Wait -NoNewWindow` 等待其完成：
+日常使用完整 `RustClipSync-0.2.0-setup-x64.exe` 安装包与 WinUI 设置页面。无参数双击后台时打开同目录的 WinUI；单独复制后台文件会显示用途提示。
+
+开发时可独立运行：
 
 ```powershell
 Start-Process -FilePath .\target\release\rustclipsync-agent.exe -ArgumentList @('pair','https://sync.example.com','your-user') -Wait -NoNewWindow
 Start-Process -FilePath .\target\release\rustclipsync-agent.exe -ArgumentList 'run'
 ```
 
-配对通过控制台隐藏输入密码，不支持密码命令行参数或明文配置。配对结束后该进程退出；日常 `run` 使用设备 token，不保留注册时的账户密码。输入缓冲尽力清理，但不承诺所有库/系统内存中的临时副本即时清零。
+`pair` 通过控制台隐藏输入密码；WinUI 使用 `--password-stdin` 与匿名子进程管道。密码不允许放在命令行、环境变量或配置里。配对子进程完成后退出，常驻 `run` 使用设备令牌。尽力清理输入缓冲，但不保证库或系统临时副本即时清零。
 
-系统托盘采用 Omaclipsync 同款图标，双击或右键“打开 RustClipSync”可打开配置窗口；右键还可暂停、恢复、退出。悬停显示 `connected`、`offline`、`paused`、`conflict`、`re_pair`、`credentials` 或 `storage_error` 等固定状态。暂停期间不补传复制内容；恢复后监听新的复制。网络中断期间仍保留最后一条本地待发送内容。
+`autostart` 与 `run` 使用相同后台入口，未配对时安静退出；配置中的暂停状态会保留。自启开关由 WinUI 管理当前用户 Startup 文件夹中的应用快捷方式，不显示 UI。
 
-已有配置需要重配时，先从托盘退出，再显式使用 `pair ... --reset`。该操作会重建设备身份并放弃当前身份的待发送内容；不会自动撤销服务端的旧设备，需在服务端管理界面删除。配置其他服务器/账户时使用不同的本地加密状态文件，旧文件不会自动删除。
+显式 `pair ... --reset` 需要先退出后台，且会放弃当前待发送内容和私有收件项。使用同一服务器和账户重配时保留同步设置。不会自动撤销旧设备记录，可在服务端管理页面删除。
 
-## 数据与配置
+## 配置与控制
 
-目录：`%LOCALAPPDATA%\RustClipSync\`。
-
-| 文件 | 内容 |
-| --- | --- |
-| `config.json` | HTTPS 地址、账户名、方向与暂停状态，无密码/token |
-| `<identity>.key.dpapi` | 当前用户 DPAPI 保护的状态加密密钥 |
-| `<identity>.state` | 核心加密状态，含设备 token、游标与有界 outbox |
-| `agent.lock` | 排他锁文件，退出后文件可保留，锁随句柄释放 |
-
-配置样例（方向可为 `both`、`upload`、`download`；修改后重启 agent）：
+建议通过 UI / Named Pipe 修改配置。运行时直接编辑 JSON 不会热加载；手工编辑应先退出后台。
 
 ```json
-{"server":"https://sync.example.com/","user":"your-user","direction":"both","paused":false}
+{
+  "server":"https://sync.example.com/",
+  "user":"your-user",
+  "direction":"both",
+  "paused":false,
+  "allowSensitive":false,
+  "intervalSec":60,
+  "filter":{"mode":"off","patterns":[],"downloads":false},
+  "history":{"enabled":false,"limit":50,"days":7}
+}
 ```
 
-敏感同步与长期历史在当前阶段均保持关闭，不接受密码等未知配置字段。识别 `ExcludeClipboardContentFromMonitorProcessing`，以及明确为零的 `CanIncludeInClipboardHistory` / `CanUploadToCloudClipboard` 提示作为敏感信号。这些提示不是完整敏感检测，应用可能不标记。收到已标记敏感消息会 skipped，不自动写入系统剪贴板。
+方向为 both/upload/download；过滤为 off/blacklist/whitelist，最多 32 条正则、每条 512 字节。备用检查间隔为 30–300 秒，正常连接使用实时元数据通知。未知字段、非法范围、无效正则或更改配对身份的更新被拒绝。
 
-系统剪贴板写入结果不确定时，恢复日志会消费为 skipped，优先防止重放，可能漏收一次。冲突、过期、设备失效、存储错误会停止自动同步；当前阶段通过退出、排障后重启/显式重配恢复，后续由 WinUI 提供完整冲突处理。DPAPI 不防同一用户权限的恶意程序，HTTPS 与磁盘加密不等于端到端加密。
+`rpc` 开发入口从标准输入读一个请求，通过安全管道返回 JSON。协议错误用固定错误码，不输出底层正文/凭据错误：
 
-## 测试边界
+```powershell
+'{"id":"inspect","ipcVersion":1,"method":"getStatus","params":{}}' | .\target\release\rustclipsync-agent.exe rpc | ConvertFrom-Json
+```
+
+冲突时手动发送是明确选择当前本机内容；接收会尝试放弃未发送项后读取未消费的远端消息。仍有请求结果不确定时不会静默覆盖。存储错误停自动副作用，需先检查数据与权限。DPAPI 不防同用户恶意程序，磁盘加密与 HTTPS 不等于端到端加密。
+
+## 验证
+
+Linux 上运行逻辑测试与类型检查：
 
 ```bash
-# Linux 上可执行的逻辑测试
 cargo test --locked
-# 仅类型检查 Win32 模块及原生测试，不在 Linux 执行 Windows API
 cargo clippy --locked --features check-windows --all-targets -- -D warnings
 python3 scripts/verify-core.py
 ```
 
-Windows 默认测试额外执行 DPAPI、状态替换、排他锁、密钥缺失、DACL 与文件限长验证，均使用临时目录。真实剪贴板测试默认忽略，只有在一次性的 Windows VM/测试会话中执行：
+Windows 默认执行 DPAPI、原子替换、ACL、锁、文件限长、匿名密码管道与敏感历史排除测试。以下测试涉及当前会话剪贴板 / 托盘 / 管道，只能在一次性 VM 中显式执行：
 
 ```powershell
 $env:RCS_WINDOWS_DISPOSABLE='1'
 cargo test --locked --test windows_clipboard -- --ignored --test-threads=1
+cargo test --locked --test windows_control -- --ignored --test-threads=1
 ```
 
-这项测试会覆盖测试会话剪贴板，不应在日常桌面运行。Windows CI 会在一次性的 GitHub 托管 runner 中显式执行它；日常电脑仍默认忽略。当前本机验证结果及待验收项见 [VALIDATION.md](../VALIDATION.md)。
+CI 另外执行实际安装、WinUI 三页、主题/字号持久化、真实自启项、配对后的 C# → Rust 控制与 UI 退出后后台存活检查。结果与待验收范围见 [VALIDATION.md](../VALIDATION.md)。
 
-共享核心源码快照由 `bash scripts/sync-core.sh` 从相邻项目导出；不要直接编辑 `agent/vendor/rustclipsync-core`。`verify-core.py` 可在独立检出中校验全部导出文件的哈希。
-
-## 图形界面与安装器
-
-日常使用请安装 `dist/installer/RustClipSync-0.1.0-setup-x64.exe`，从开始菜单打开 RustClipSync。不要只复制后台 EXE，WinUI 的运行库需要完整目录。无参数双击后台时，若同目录存在 WinUI 程序会打开它；独立后台文件会明确提示其用途，不再静默退出。
-
-WinUI 使用 C#/XAML、.NET 10 和 Windows App SDK 2.6.4，按需启动；注册密码通过专属子进程的匿名 stdin 管道传递，大小限额 8 KiB。普通 `pair` 控制台输入仍可使用。首次配置窗口是当前可用入口，完整历史和设置页面后续补齐。
+共享源码快照由 `scripts/sync-core.sh` 从独立项目导出。不要手工编辑 vendor；校验器在独立检出中验证全部导出文件的 SHA-256。

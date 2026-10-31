@@ -33,6 +33,7 @@ do { $status = Get-Control SyncState; if ($status.Current.Name -eq '已暂停自
 if ($status.Current.Name -ne '已暂停自动同步') { throw "WinUI did not read actual backend state: $($status.Current.Name)" }
 $all = $script:window.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.Condition]::TrueCondition)
 foreach ($element in $all) { if ($element.Current.Name -like '*UI private fixture*') { throw 'Private inbox plaintext leaked into UI automation' } }
+Start-Sleep -Seconds 2 # let the compositor finish the reopened window's first frames
 Save-Screen 'paired-home-dark'
 # Appearance JSON from the preceding process must still be selected after reopen.
 Invoke-Control NavAppearance

@@ -14,13 +14,13 @@ Windows 11 原生剪贴板同步客户端，使用 **WinUI 3 / C# / XAML 界面�
 | 外观 | 跟随系统、浅色、深色主题；标准/较大/大字号，立即应用并保存 |
 | 设置 | 服务端与账户配对、敏感策略、正则过滤及测试、备用检查间隔、历史条数/期限、登录自启、关于及脱敏诊断 |
 
-普通历史支持搜索、分页、复制、收藏、删除及清空。收藏最多 50 条，保留至手动删除；普通历史默认最多 50 条、保留 7 天，可调整为 1–1000 条和 1–365 天。历史默认关闭，单条最多 1 MiB、总正文最多 16 MiB，超限不会回滚已完成的同步。
+普通历史支持搜索、分页、复制、收藏、删除及清空。当前配对的过期数据在后台运行时清理。收藏最多 50 条，保留至手动删除；普通历史默认最多 50 条、保留 7 天，可调整为 1–1000 条和 1–365 天。历史默认关闭，单条最多 1 MiB、总正文最多 16 MiB，超限不会回滚已完成的同步。
 
 同步使用共享 [rustclipsync-core](https://github.com/Infinifar/rustclipsync-core)。消息由 UUID、epoch、revision 与持久化游标控制，离线只同步最后一条，清空剪贴板或重启不会重放已消费内容。手动接收也不会恢复已经消费的旧值。首次启动不上传已有剪贴板。当前仅支持文本，最大 10 MiB，不支持旧 SyncClipboard 协议。
 
 ## 安装与升级
 
-使用 [Windows CI](https://github.com/Infinifar/rustclipsync-desktop/actions/workflows/windows.yml) 中通过全部检查的 `rustclipsync-windows-x64-setup` 产物，解压并运行 **RustClipSync-0.2.0-setup-x64.exe**。产物内包含 SHA256SUMS 与实际运行截图。当前为未签名开发安装包。
+下载 [已验证的 Windows x64 0.2.0 安装产物](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41206349593/artifacts/13044905561)，解压并运行 **RustClipSync-0.2.0-setup-x64.exe**。产物内包含 SHA256SUMS 与实际运行截图。当前为未签名开发安装包。
 
 按用户安装，默认无需管理员权限，内含 .NET、WinUI 和应用本地 C++ 运行组件。安装后从开始菜单打开，进入“设置 → 服务端与账户”，填写 HTTPS 根地址、用户名和密码，点击“连接并启动”。
 
