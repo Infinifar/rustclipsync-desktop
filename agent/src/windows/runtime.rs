@@ -3,7 +3,10 @@ use super::{
     history::LocalHistory,
     storage::{self, FileStateStore},
 };
-use crate::{config::Config, ipc::Command};
+use crate::{
+    config::{Config, Shortcuts},
+    ipc::Command,
+};
 use rustclipsync_core::{
     adapters::{Clipboard, ClipboardError, NoHistory},
     client::Client,
@@ -26,6 +29,12 @@ use std::{
 use windows_sys::Win32::UI::WindowsAndMessaging::{PostMessageW, WM_APP};
 pub const STATUS_CHANGED: u32 = WM_APP + 2;
 pub const WORKER_STOPPED: u32 = WM_APP + 3;
+pub const UPDATE_SHORTCUTS: u32 = WM_APP + 4;
+pub struct ShortcutRequest {
+    pub settings: Shortcuts,
+    pub reply: SyncSender<Result<(), &'static str>>,
+    pub cancelled: AtomicBool,
+}
 struct Job {
     command: Command,
     reply: SyncSender<Result<Value, &'static str>>,
@@ -49,6 +58,8 @@ pub struct Control {
     pub hwnd: AtomicUsize,
     pub status: Mutex<&'static str>,
     pub wake: SyncSender<(u64, Event)>,
+    pub shortcut_error: AtomicBool,
+    pub shortcut_request: Mutex<Option<Arc<ShortcutRequest>>>,
     snapshot: Mutex<Snapshot>,
     commands: Mutex<VecDeque<Job>>,
     fatal: AtomicBool,
@@ -62,6 +73,8 @@ impl Control {
             hwnd: AtomicUsize::new(0),
             status: Mutex::new("connecting"),
             wake,
+            shortcut_error: AtomicBool::new(false),
+            shortcut_request: Mutex::new(None),
             snapshot: Mutex::new(Snapshot {
                 config: config.clone(),
                 revision: 1,
@@ -94,7 +107,7 @@ impl Control {
     fn status_value(&self) -> Result<Value, &'static str> {
         let s = self.snapshot.lock().map_err(|_| "unavailable")?;
         Ok(
-            json!({"state":*self.status.lock().map_err(|_|"unavailable")?,"paused":self.paused.load(Ordering::SeqCst),"config":s.config,"configRevision":s.revision,"deviceId":s.device,"cursor":s.cursor,"pending":s.pending,"lastSync":s.last_sync,"historyError":s.history_error,"historyRevision":s.history_revision,"inbox":s.inbox,"version":env!("CARGO_PKG_VERSION")}),
+            json!({"state":*self.status.lock().map_err(|_|"unavailable")?,"paused":self.paused.load(Ordering::SeqCst),"config":s.config,"configRevision":s.revision,"deviceId":s.device,"cursor":s.cursor,"pending":s.pending,"lastSync":s.last_sync,"historyError":s.history_error,"historyRevision":s.history_revision,"inbox":s.inbox,"shortcutError":self.shortcut_error.load(Ordering::SeqCst),"version":env!("CARGO_PKG_VERSION")}),
         )
     }
     pub fn execute(&self, command: Command) -> Result<Value, &'static str> {
@@ -133,6 +146,44 @@ impl Control {
         self.notify();
         rx.recv_timeout(Duration::from_secs(60))
             .map_err(|_| "operation_unconfirmed")?
+    }
+    pub fn shortcuts(&self) -> Shortcuts {
+        self.snapshot
+            .lock()
+            .map(|s| s.config.shortcuts.clone())
+            .unwrap_or_default()
+    }
+    fn bind_shortcuts(&self, settings: &Shortcuts) -> Result<(), SyncError> {
+        let (tx, rx) = mpsc::sync_channel(1);
+        let request = Arc::new(ShortcutRequest {
+            settings: settings.clone(),
+            reply: tx,
+            cancelled: AtomicBool::new(false),
+        });
+        *self
+            .shortcut_request
+            .lock()
+            .map_err(|_| io::Error::other("shortcuts unavailable"))? = Some(request.clone());
+        if unsafe {
+            PostMessageW(
+                self.hwnd.load(Ordering::SeqCst) as _,
+                UPDATE_SHORTCUTS,
+                0,
+                0,
+            )
+        } == 0
+        {
+            request.cancelled.store(true, Ordering::SeqCst);
+            return Err(io::Error::other("shortcut window unavailable").into());
+        }
+        match rx.recv_timeout(Duration::from_secs(3)) {
+            Ok(Ok(())) => Ok(()),
+            Ok(Err(_)) => Err(SyncError::Remote(Error::Status(423))),
+            Err(_) => {
+                request.cancelled.store(true, Ordering::SeqCst);
+                Err(io::Error::other("shortcut update unconfirmed").into())
+            }
+        }
     }
     fn refresh(&self, config: &Config, session: &LiveSession, outcome: Option<&Outcome>) {
         if let Ok(mut s) = self.snapshot.lock() {
@@ -506,6 +557,7 @@ fn command(
         Command::UpdateSettings {
             config: mut updated,
             expected_revision,
+            rebind_shortcuts,
         } => {
             updated.validate().map_err(|_| invalid())?;
             if updated.identity() != config.identity() {
@@ -523,7 +575,16 @@ fn command(
             {
                 s.record_clear()?;
             }
-            save_config(dir, &updated)?;
+            let changed_shortcuts = updated.shortcuts != config.shortcuts || rebind_shortcuts;
+            if changed_shortcuts {
+                control.bind_shortcuts(&updated.shortcuts)?;
+            }
+            if let Err(error) = save_config(dir, &updated) {
+                if changed_shortcuts {
+                    control.bind_shortcuts(&config.shortcuts)?;
+                }
+                return Err(error);
+            }
             s.update_policy(updated.filter.compile()?, updated.allow_sensitive);
             receive_policy(s, &updated);
             s.history.configure(updated.history.clone());
@@ -639,6 +700,7 @@ pub fn classify(error: &SyncError) -> &'static str {
         SyncError::Remote(Error::InvalidProfile) => "invalid_request",
         SyncError::Remote(Error::Status(412)) => "settings_changed",
         SyncError::Remote(Error::Status(422)) => "history_error",
+        SyncError::Remote(Error::Status(423)) => "shortcut_conflict",
         _ => "offline",
     }
 }

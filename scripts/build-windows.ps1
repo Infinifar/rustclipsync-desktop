@@ -16,7 +16,7 @@ $makepri = Get-ChildItem "${env:ProgramFiles(x86)}/Windows Kits/10/bin" -Recurse
 if (!$makepri) { throw 'Windows SDK makepri.exe is required' }
 & $makepri.FullName dump /if "$bundle/resources.pri" /of "$root/dist/resources.xml" /o
 if ($LASTEXITCODE -ne 0) { throw 'Application resource index inspection failed' }
-foreach ($entry in @('MainWindow.xbf','themeresources.xbf')) {
+foreach ($entry in @('MainWindow.xbf','HistoryWindow.xbf','HistoryView.xbf','SensitiveInboxWindow.xbf','themeresources.xbf')) {
     if (!(Select-String -Path "$root/dist/resources.xml" -Pattern $entry -SimpleMatch)) { throw "Missing compiled XAML resource: $entry" }
 }
 Copy-Item "$root/target/release/rustclipsync-agent.exe" $bundle -Force

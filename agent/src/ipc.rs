@@ -27,6 +27,8 @@ pub enum Command {
         config: Config,
         #[serde(rename = "expectedRevision")]
         expected_revision: u64,
+        #[serde(default, rename = "rebindShortcuts")]
+        rebind_shortcuts: bool,
     },
     PushNow {},
     PullNow {},

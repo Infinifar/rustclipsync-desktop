@@ -2,6 +2,7 @@
 pub mod clipboard;
 pub mod runtime;
 pub mod security;
+pub mod shortcuts;
 pub mod storage;
 pub mod window;
 use std::{io, path::Path};

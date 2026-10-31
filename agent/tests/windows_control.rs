@@ -7,6 +7,7 @@ use std::{
     process::{Child, Command, Stdio},
     time::{Duration, Instant},
 };
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::{RegisterHotKey, UnregisterHotKey};
 struct Guard(Child);
 impl Drop for Guard {
     fn drop(&mut self) {
@@ -171,6 +172,57 @@ fn native_pipe_controls_real_agent_preserves_identity_and_never_exposes_secrets(
         )["result"]["uploadAllowed"],
         false
     );
+    updated.shortcuts.history = Some(rustclipsync_agent::config::KeyBinding {
+        modifiers: 3,
+        key: 0x78,
+    });
+    updated.shortcuts.inbox = Some(rustclipsync_agent::config::KeyBinding {
+        modifiers: 3,
+        key: 0x79,
+    });
+    assert_eq!(
+        rpc(
+            "updateSettings",
+            json!({"config":updated,"expectedRevision":3})
+        )["ok"],
+        true
+    );
+    unsafe {
+        assert_ne!(RegisterHotKey(std::ptr::null_mut(), 88, 3, 0x7a), 0);
+    }
+    let mut conflict = updated.clone();
+    conflict.shortcuts.history.as_mut().unwrap().key = 0x7a;
+    assert_eq!(
+        rpc(
+            "updateSettings",
+            json!({"config":conflict,"expectedRevision":4})
+        )["error"],
+        "shortcut_conflict"
+    );
+    assert_eq!(
+        rpc("getStatus", json!({}))["result"]["config"]["shortcuts"]["history"]["key"],
+        0x78
+    );
+    assert_eq!(rpc("getStatus", json!({}))["result"]["configRevision"], 4);
+    unsafe {
+        assert_eq!(
+            RegisterHotKey(std::ptr::null_mut(), 89, 3, 0x78),
+            0,
+            "old binding was lost on conflict"
+        );
+        UnregisterHotKey(std::ptr::null_mut(), 88);
+    }
+    assert_eq!(
+        rpc(
+            "updateSettings",
+            json!({"config":updated,"expectedRevision":4,"rebindShortcuts":true})
+        )["ok"],
+        true
+    );
+    assert_eq!(
+        rpc("getStatus", json!({}))["result"]["shortcutError"],
+        false
+    );
     assert_eq!(rpc("clearHistory", json!({}))["ok"], true);
     assert_eq!(rpc("getStatus", json!({}))["result"]["cursor"], 42);
     rpc("quit", json!({}));
@@ -199,4 +251,13 @@ fn native_pipe_controls_real_agent_preserves_identity_and_never_exposes_secrets(
     assert_eq!(config.history.days, 3);
     assert!(config.allow_sensitive);
     assert!(!config.auto_apply_sensitive);
+    assert_eq!(config.shortcuts.history.unwrap().key, 0x78);
+    unsafe {
+        assert_ne!(
+            RegisterHotKey(std::ptr::null_mut(), 90, 3, 0x78),
+            0,
+            "quit did not release shortcut"
+        );
+        UnregisterHotKey(std::ptr::null_mut(), 90);
+    }
 }

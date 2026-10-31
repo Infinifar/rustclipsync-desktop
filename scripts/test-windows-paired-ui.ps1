@@ -85,11 +85,13 @@ $end = (Get-Date).AddSeconds(15)
 do { $stored = Get-Content "$data/config.json" -Raw | ConvertFrom-Json; if ($stored.history.enabled) { break }; Start-Sleep -Milliseconds 100 } while ((Get-Date) -lt $end)
 if (!$stored.history.enabled -or $stored.history.days -ne 7) { throw 'WinUI settings were not saved by the backend' }
 . "$PSScriptRoot/test-windows-sensitive-ui.ps1"
+. "$PSScriptRoot/test-windows-shortcuts-ui.ps1"
 # Closing the UI must leave exactly one background process; stop it explicitly.
 $ui.CloseMainWindow() | Out-Null
 if (!$ui.WaitForExit(10000) -or $ui.ExitCode -ne 0) { throw 'Paired UI did not exit cleanly' }
 $background = @(Get-Process -Name rustclipsync-agent -ErrorAction SilentlyContinue | Where-Object Path -eq (Join-Path $destination 'rustclipsync-agent.exe'))
 if ($background.Count -ne 1) { throw 'Closing UI did not preserve exactly one background process' }
+. "$PSScriptRoot/test-windows-shortcuts-background.ps1"
 $request = @{id=[Guid]::NewGuid().ToString();ipcVersion=1;method='quit';params=@{}} | ConvertTo-Json -Compress
 $request | & "$destination/rustclipsync-agent.exe" rpc | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Explicit background quit failed' }

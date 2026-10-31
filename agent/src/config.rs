@@ -3,6 +3,41 @@ use serde::{Deserialize, Serialize};
 use std::io;
 use url::Url;
 
+#[derive(Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct KeyBinding {
+    pub modifiers: u32,
+    pub key: u32,
+}
+#[derive(Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Shortcuts {
+    #[serde(default)]
+    pub history: Option<KeyBinding>,
+    #[serde(default)]
+    pub inbox: Option<KeyBinding>,
+}
+impl Shortcuts {
+    pub fn validate(&self) -> io::Result<()> {
+        for binding in [self.history, self.inbox].into_iter().flatten() {
+            if binding.modifiers & !15 != 0
+                || binding.modifiers & 11 == 0
+                || !((0x30..=0x39).contains(&binding.key)
+                    || (0x41..=0x5a).contains(&binding.key)
+                    || (0x70..=0x87).contains(&binding.key))
+                || binding.key == 0x7b
+            // F12 is reserved for debuggers.
+            {
+                return Err(invalid("invalid shortcut"));
+            }
+        }
+        if self.history.is_some() && self.history == self.inbox {
+            return Err(invalid("duplicate shortcut"));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum Direction {
@@ -88,6 +123,8 @@ pub struct Config {
     #[serde(default)]
     pub auto_apply_sensitive: bool,
     #[serde(default)]
+    pub shortcuts: Shortcuts,
+    #[serde(default)]
     pub filter: FilterSettings,
     #[serde(default)]
     pub history: HistorySettings,
@@ -103,6 +140,7 @@ impl Config {
             paused: false,
             allow_sensitive: false,
             auto_apply_sensitive: false,
+            shortcuts: Shortcuts::default(),
             filter: FilterSettings::default(),
             history: HistorySettings::default(),
             interval_sec: 60,
@@ -132,6 +170,7 @@ impl Config {
             return Err(invalid("settings outside allowed range"));
         }
         self.filter.compile()?;
+        self.shortcuts.validate()?;
         self.server = url.to_string();
         Ok(())
     }
@@ -175,6 +214,7 @@ mod tests {
         assert!(c.paused);
         assert!(!c.allow_sensitive);
         assert!(!c.auto_apply_sensitive);
+        assert!(c.shortcuts.history.is_none() && c.shortcuts.inbox.is_none());
         assert!(!c.history.enabled);
         assert_eq!(c.history.days, 7);
         let c: Config = serde_json::from_str(
@@ -196,6 +236,43 @@ mod tests {
                     serde_json::from_slice(&serde_json::to_vec(&c).unwrap()).unwrap();
                 assert_eq!(restored.applies_sensitive(), allow && auto);
             }
+        }
+    }
+    #[test]
+    fn shortcuts_require_modifiers_unique_bindings_and_supported_keys() {
+        let binding = KeyBinding {
+            modifiers: 3,
+            key: 0x48,
+        };
+        let mut s = Shortcuts {
+            history: Some(binding),
+            inbox: None,
+        };
+        assert!(s.validate().is_ok());
+        s.inbox = s.history;
+        assert!(s.validate().is_err());
+        s.inbox = None;
+        for invalid in [
+            KeyBinding {
+                modifiers: 0,
+                ..binding
+            },
+            KeyBinding {
+                modifiers: 4,
+                ..binding
+            },
+            KeyBinding {
+                key: 0x7b,
+                ..binding
+            },
+            KeyBinding { key: 0, ..binding },
+            KeyBinding {
+                modifiers: 0x4003,
+                ..binding
+            },
+        ] {
+            s.history = Some(invalid);
+            assert!(s.validate().is_err());
         }
     }
     #[test]

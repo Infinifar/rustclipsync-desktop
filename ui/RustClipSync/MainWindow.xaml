@@ -1,6 +1,7 @@
 <Window x:Class="RustClipSync.MainWindow"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:local="using:RustClipSync"
  Title="RustClipSync">
  <Grid x:Name="Root" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
   <Grid.Resources>
@@ -16,6 +17,7 @@
    <NavigationView.MenuItems>
     <NavigationViewItem x:Name="HomeNav" Content="主页" Icon="Home" Tag="home" AutomationProperties.AutomationId="NavHome"/>
     <NavigationViewItem x:Name="AppearanceNav" Content="外观" Tag="appearance" AutomationProperties.AutomationId="NavAppearance"><NavigationViewItem.Icon><FontIcon Glyph="&#xE790;"/></NavigationViewItem.Icon></NavigationViewItem>
+    <NavigationViewItem x:Name="ShortcutsNav" Content="快捷键" Tag="shortcuts" AutomationProperties.AutomationId="NavShortcuts"><NavigationViewItem.Icon><FontIcon Glyph="&#xE765;"/></NavigationViewItem.Icon></NavigationViewItem>
     <NavigationViewItem x:Name="SettingsNav" Content="设置" Icon="Setting" Tag="settings" AutomationProperties.AutomationId="NavSettings"/>
    </NavigationView.MenuItems>
    <ScrollViewer x:Name="PageScroll" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Top" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
@@ -40,10 +42,6 @@
        <ComboBox x:Name="DirectionBox" Header="同步方向" HorizontalAlignment="Stretch" SelectionChanged="Direction_Changed" AutomationProperties.AutomationId="SyncDirection">
         <ComboBoxItem Content="双向同步" Tag="both"/><ComboBoxItem Content="仅发送" Tag="upload"/><ComboBoxItem Content="仅接收" Tag="download"/>
        </ComboBox>
-       <StackPanel Orientation="Horizontal" Spacing="10">
-        <Button Content="连接设置" Click="OpenSettings_Click"/>
-        <Button x:Name="StopButton" Content="退出后台" Click="Stop_Click" IsEnabled="False"/>
-       </StackPanel>
        <Border x:Name="InboxCard" AutomationProperties.AutomationId="SensitiveInboxCard" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
         <StackPanel Spacing="10">
          <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="敏感收件区" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"/><HyperlinkButton x:Name="OpenInboxButton" Grid.Column="1" Content="以小窗显示" Click="OpenInboxWindow_Click" IsEnabled="False" AutomationProperties.AutomationId="OpenSensitiveWindow"/></Grid>
@@ -59,24 +57,12 @@
          </StackPanel></ScrollViewer>
         </StackPanel>
        </Border>
+       <StackPanel Orientation="Horizontal" Spacing="10">
+        <Button Content="连接设置" Click="OpenSettings_Click" AutomationProperties.AutomationId="ConnectionSettings"/>
+        <Button x:Name="StopButton" Content="退出后台" Click="Stop_Click" IsEnabled="False" AutomationProperties.AutomationId="StopBackground"/>
+       </StackPanel>
        <Expander x:Name="HistoryPanel" Header="剪贴板历史" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Expanding="History_Expanding" AutomationProperties.AutomationId="HistoryPanel">
-        <StackPanel Spacing="12">
-         <TextBlock x:Name="HistoryNote" Text="历史默认关闭。可在设置中开启，本地记录会加密保存。" Style="{StaticResource Note}"/>
-         <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-          <TextBox x:Name="HistorySearch" PlaceholderText="搜索历史内容" MaxLength="256" AutomationProperties.Name="搜索历史"/>
-          <ComboBox x:Name="HistoryScope" Grid.Column="1" SelectedIndex="0"><ComboBoxItem Content="全部"/><ComboBoxItem Content="收藏"/></ComboBox>
-          <Button Grid.Column="2" Content="搜索" Click="SearchHistory_Click"/>
-         </Grid>
-         <ListView x:Name="HistoryList" SelectionMode="None" IsItemClickEnabled="False" MaxHeight="380" HorizontalContentAlignment="Stretch">
-          <ListView.ItemTemplate><DataTemplate><StackPanel Spacing="8" Padding="0,8" HorizontalAlignment="Stretch">
-           <TextBlock Text="{Binding Preview}" TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis"/>
-           <TextBlock Text="{Binding Detail}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12"/>
-           <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="复制" Tag="{Binding Id}" Click="CopyHistory_Click"/><Button Content="{Binding FavoriteLabel}" Tag="{Binding Id}" Click="FavoriteHistory_Click"/><Button Content="删除" Tag="{Binding Id}" Click="DeleteHistory_Click"/></StackPanel>
-          </StackPanel></DataTemplate></ListView.ItemTemplate>
-         </ListView>
-         <TextBlock x:Name="EmptyHistory" Text="暂无历史记录" Style="{StaticResource Note}"/>
-         <StackPanel Orientation="Horizontal" Spacing="10"><Button x:Name="PreviousHistory" Content="上一页" Click="PreviousHistory_Click"/><Button x:Name="NextHistory" Content="下一页" Click="NextHistory_Click"/><Button Content="清空历史" Click="ClearHistory_Click"/><TextBlock x:Name="HistoryCount" VerticalAlignment="Center"/></StackPanel>
-        </StackPanel>
+        <local:HistoryView x:Name="HistoryContents"/>
        </Expander>
        <TextBlock Text="已启动的同步会在关闭窗口后继续运行。双击托盘图标可再次打开，托盘菜单可暂停或退出。" Style="{StaticResource Note}"/>
       </StackPanel>
@@ -87,6 +73,15 @@
        <ComboBox x:Name="FontChoice" Header="文字大小" HorizontalAlignment="Stretch" SelectionChanged="Appearance_Changed" AutomationProperties.AutomationId="FontChoice"><ComboBoxItem Content="标准" Tag="14"/><ComboBoxItem Content="较大" Tag="16"/><ComboBoxItem Content="大" Tag="18"/></ComboBox>
        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="20"><StackPanel Spacing="12"><TextBlock Text="预览" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="剪贴板已连接，可以开始同步。" TextWrapping="Wrap"/><StackPanel Orientation="Horizontal" Spacing="8"><Button Content="发送"/><Button Content="接收"/><Button Content="暂停"/></StackPanel></StackPanel></Border>
        <TextBlock Text="更改会立即生效，并在下次打开时保留。" Style="{StaticResource Note}"/>
+      </StackPanel>
+      <StackPanel x:Name="ShortcutsPage" Visibility="Collapsed" Spacing="16">
+       <TextBlock Text="快捷键" Style="{StaticResource SectionTitle}"/>
+       <TextBlock Text="后台运行时，全局快捷键可打开独立窗口，再次按下关闭对应窗口。主窗口关闭后仍可使用。" Style="{StaticResource Note}"/>
+       <TextBox x:Name="HistoryShortcutBox" Header="打开 / 关闭历史记录" PlaceholderText="例如 Ctrl+Alt+H，留空不绑定" AutomationProperties.AutomationId="HistoryShortcut" MaxLength="80"/>
+       <TextBox x:Name="InboxShortcutBox" Header="打开 / 关闭敏感收件小窗" PlaceholderText="例如 Ctrl+Alt+I，留空不绑定" AutomationProperties.AutomationId="InboxShortcut" MaxLength="80"/>
+       <TextBlock Text="填写组合键名称即可，无需同时按键。使用 Ctrl、Alt、Shift、Win 加字母、数字或 F1–F24（不含 F12）；至少包含 Ctrl、Alt 或 Win。系统保留或其他应用占用的组合无法注册。留空并保存可解除绑定。" Style="{StaticResource Note}"/>
+       <TextBlock x:Name="ShortcutState" Text="默认不绑定快捷键。完成连接并启动后台后可保存。" TextWrapping="Wrap" AutomationProperties.AutomationId="ShortcutState"/>
+       <StackPanel Orientation="Horizontal" Spacing="10"><Button x:Name="SaveShortcutsButton" Content="保存快捷键" Click="SaveShortcuts_Click" AutomationProperties.AutomationId="SaveShortcuts"/><Button Content="重新载入" Click="ReloadShortcuts_Click" AutomationProperties.AutomationId="ReloadShortcuts"/></StackPanel>
       </StackPanel>
       <StackPanel x:Name="SettingsPage" Visibility="Collapsed" Spacing="20">
        <TextBlock Text="设置" Style="{StaticResource SectionTitle}"/>
@@ -128,7 +123,7 @@
        </Expander>
        <StackPanel Orientation="Horizontal" Spacing="10"><Button x:Name="SaveSettingsButton" Content="保存同步设置" Style="{ThemeResource AccentButtonStyle}" Click="SaveSettings_Click" AutomationProperties.AutomationId="SaveSyncSettings"/><Button AutomationProperties.AutomationId="ReloadSettings" Content="重新载入" Click="ReloadSettings_Click"/></StackPanel>
        <Expander Header="关于与诊断" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
-        <StackPanel Spacing="12"><TextBlock Text="RustClipSync 0.2.2" FontWeight="SemiBold"/><TextBlock Text="与 Android 输入法和 Omaclipsync 使用同一同步协议。界面关闭后，后台同步独立运行。" Style="{StaticResource Note}"/>
+        <StackPanel Spacing="12"><TextBlock Text="RustClipSync 0.2.3" FontWeight="SemiBold"/><TextBlock Text="与 Android 输入法和 Omaclipsync 使用同一同步协议。界面关闭后，后台同步独立运行。" Style="{StaticResource Note}"/>
          <StackPanel Orientation="Horizontal" Spacing="8"><HyperlinkButton Content="服务端" NavigateUri="https://github.com/Infinifar/rustclipsync-server"/><HyperlinkButton Content="Android 输入法" NavigateUri="https://github.com/Infinifar/fcitx5-android-bibi-keyboard"/><HyperlinkButton Content="Omaclipsync" NavigateUri="https://github.com/Infinifar/omaclipsync"/></StackPanel>
          <Button Content="导出脱敏诊断" Click="Diagnostics_Click"/><TextBlock x:Name="DiagnosticsResult" IsTextSelectionEnabled="True" Style="{StaticResource Note}"/>
         </StackPanel>

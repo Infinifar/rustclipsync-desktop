@@ -1,9 +1,11 @@
 use super::{
     clipboard::Formats,
-    runtime::{Control, STATUS_CHANGED, WORKER_STOPPED},
+    runtime::{Control, STATUS_CHANGED, UPDATE_SHORTCUTS, WORKER_STOPPED},
+    shortcuts::Hotkeys,
     wide,
 };
 use std::{
+    cell::RefCell,
     io, mem, ptr,
     sync::{atomic::Ordering, Arc},
 };
@@ -22,6 +24,7 @@ const QUIT: usize = 1002;
 struct Context {
     control: Arc<Control>,
     taskbar: u32,
+    hotkeys: RefCell<Hotkeys>,
 }
 pub struct Window {
     hwnd: HWND,
@@ -42,6 +45,7 @@ impl Window {
             }
             let mut context = Box::new(Context {
                 control,
+                hotkeys: RefCell::new(Hotkeys::default()),
                 taskbar: RegisterWindowMessageW(wide("TaskbarCreated").as_ptr()),
             });
             let hwnd = CreateWindowExW(
@@ -62,6 +66,15 @@ impl Window {
                 return Err(io::Error::last_os_error());
             }
             context.control.hwnd.store(hwnd as usize, Ordering::SeqCst);
+            let binding_failed = context
+                .hotkeys
+                .borrow_mut()
+                .replace(hwnd as usize, &context.control.shortcuts())
+                .is_err();
+            context
+                .control
+                .shortcut_error
+                .store(binding_failed, Ordering::SeqCst);
             if AddClipboardFormatListener(hwnd) == 0 {
                 DestroyWindow(hwnd);
                 return Err(io::Error::last_os_error());
@@ -106,6 +119,7 @@ impl Drop for Window {
     fn drop(&mut self) {
         unsafe {
             self.tray(NIM_DELETE);
+            self._context.hotkeys.borrow_mut().clear(self.hwnd as usize);
             RemoveClipboardFormatListener(self.hwnd);
             if IsWindow(self.hwnd) != 0 {
                 DestroyWindow(self.hwnd);
@@ -134,6 +148,42 @@ unsafe extern "system" fn procedure(
         return 0;
     }
     match message {
+        UPDATE_SHORTCUTS => {
+            let request = control
+                .shortcut_request
+                .lock()
+                .ok()
+                .and_then(|mut r| r.take());
+            if let Some(request) = request {
+                if !request.cancelled.load(Ordering::SeqCst) {
+                    let previous = control.shortcuts();
+                    let result = context
+                        .hotkeys
+                        .borrow_mut()
+                        .replace(hwnd as usize, &request.settings);
+                    if request.cancelled.load(Ordering::SeqCst) {
+                        let failed = context
+                            .hotkeys
+                            .borrow_mut()
+                            .replace(hwnd as usize, &previous)
+                            .is_err();
+                        control.shortcut_error.store(failed, Ordering::SeqCst);
+                    } else {
+                        if result.is_ok() {
+                            control.shortcut_error.store(false, Ordering::SeqCst);
+                        }
+                        let _ = request.reply.send(result);
+                    }
+                }
+            }
+            0
+        }
+        WM_HOTKEY => {
+            if let Some(action) = context.hotkeys.borrow().action(wparam) {
+                open_ui(Some(action));
+            }
+            0
+        }
         WM_CLIPBOARDUPDATE => {
             control.generation.fetch_add(1, Ordering::SeqCst);
             control.notify();
@@ -209,6 +259,7 @@ unsafe extern "system" fn procedure(
             0
         }
         WM_DESTROY => {
+            context.hotkeys.borrow_mut().clear(hwnd as usize);
             tray(hwnd, control, NIM_DELETE);
             RemoveClipboardFormatListener(hwnd);
             PostQuitMessage(0);
@@ -240,10 +291,17 @@ unsafe fn tray(hwnd: HWND, control: &Control, action: u32) -> bool {
 }
 
 fn open_settings() {
+    open_ui(None);
+}
+fn open_ui(action: Option<&str>) {
     if let Ok(exe) = std::env::current_exe() {
         let ui = exe.with_file_name("RustClipSync.exe");
         if ui.is_file() {
-            let _ = std::process::Command::new(ui).spawn();
+            let mut command = std::process::Command::new(ui);
+            if let Some(action) = action {
+                command.arg(action);
+            }
+            let _ = command.spawn();
         }
     }
 }

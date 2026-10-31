@@ -16,12 +16,7 @@ public sealed partial class MainWindow : Window
     private string? inboxId;
     private bool inboxRevealed;
     private long inboxGeneration;
-    private long lastSync;
-    private ulong lastHistoryRevision;
-    private int historyOffset, historyTotal;
-    private List<HistoryRow> history = [];
     private AppearanceSettings appearance = new();
-    private SensitiveInboxWindow? inboxWindow;
     private static string ConfigPath => Path.Combine(AgentClient.DataPath, "config.json");
     public MainWindow()
     {
@@ -80,6 +75,7 @@ public sealed partial class MainWindow : Window
             "expired" => "待发送内容已经过期，请主动重新发送或接收。",
             "storage_error" or "needs_restart" => "本地状态不可用，已停止自动操作。请退出后台并检查本地数据，再重新启动。",
             "clipboard_error" => "剪贴板暂时不可用或被其他应用占用，请稍后重试。",
+            "shortcut_conflict" => "快捷键已被系统或其他应用占用，原有绑定与设置已保留。请换一个组合。",
             "invalid_filter" => "正则表达式无效，或超过 32 条、每条 512 字节的限制。",
             "invalid_request" => "请检查数值范围、过滤规则、条目是否仍然存在，以及收藏是否超过 50 条。",
             "history_error" => "本地历史无法读取或保存。同步状态没有被清空，可备份数据后手动清空历史。",
@@ -95,6 +91,7 @@ public sealed partial class MainWindow : Window
         PauseButton.IsEnabled = !value; StopButton.IsEnabled = !value && running;
         DirectionBox.IsEnabled = !value && running;
         HistoryPanel.IsEnabled = !value && running;
+        SaveShortcutsButton.IsEnabled = !value && running && config is not null;
         InboxControls();
     }
     private async Task<bool> Confirm(string title, string message, string action)
@@ -104,12 +101,14 @@ public sealed partial class MainWindow : Window
     }
     private void Navigation_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
-        if (HomePage is null || AppearancePage is null || SettingsPage is null) return;
+        if (HomePage is null || AppearancePage is null || SettingsPage is null || ShortcutsPage is null) return;
         var page = (args.SelectedItem as NavigationViewItem)?.Tag as string;
         if (page != "home") HideInbox();
         HomePage.Visibility = page == "home" ? Visibility.Visible : Visibility.Collapsed;
         AppearancePage.Visibility = page == "appearance" ? Visibility.Visible : Visibility.Collapsed;
         SettingsPage.Visibility = page == "settings" ? Visibility.Visible : Visibility.Collapsed;
+        ShortcutsPage.Visibility = page == "shortcuts" ? Visibility.Visible : Visibility.Collapsed;
+        if (page == "shortcuts" && initialized) LoadShortcuts();
         if (page == "settings" && initialized) { LoadForm(); ReadStartup(); }
         if (page != "settings") PasswordBox.Password = "";
         if (initialized) DispatcherQueue.TryEnqueue(() => {
@@ -175,12 +174,8 @@ public sealed partial class MainWindow : Window
             InboxMetadata(snapshot.GetProperty("inbox"));
             PauseButton.Content = paused ? "恢复" : "暂停";
             updating = true; DirectionBox.SelectedIndex = config.Direction == "download" ? 2 : config.Direction == "upload" ? 1 : 0; updating = false;
-            HistoryNote.Text = config.History.Enabled ? $"本地历史已加密，普通记录保留 {config.History.Days} 天；收藏保留至手动删除。" : "历史记录未开启。已有记录仍按期限清理，可在设置中开启或手动清空。";
-            if (snapshot.GetProperty("historyError").GetBoolean()) HistoryNote.Text = "历史记录不可用；同步独立运行。请备份数据后检查权限或手动清空历史。";
             if (!formLoaded) LoadForm();
-            var historyRevision = snapshot.TryGetProperty("historyRevision", out var historyVersion) ? historyVersion.GetUInt64() : snapshot.GetProperty("cursor").GetUInt64();
-            if (HistoryPanel.IsExpanded && (timestamp != lastSync || historyRevision != lastHistoryRevision)) await LoadHistory();
-            lastSync = timestamp; lastHistoryRevision = historyRevision;
+            ShortcutState.Text = snapshot.TryGetProperty("shortcutError", out var hotkeyError) && hotkeyError.GetBoolean() ? "快捷键注册失败，可能已被占用。请修改或重新保存；同步仍独立运行。" : "快捷键由后台注册，关闭主窗口仍有效。";
         }
         catch { if (!closed) { StateText.Text = "后台正在启动或处理操作"; InboxMetadata(null, "暂时无法读取收件项"); } }
         finally { if (!closed) SetBusy(busy); }
@@ -281,21 +276,10 @@ public sealed partial class MainWindow : Window
     {
         if (!running) return;
         HideInbox();
-        try
-        {
-            if (inboxWindow is null)
-            {
-                inboxWindow = new SensitiveInboxWindow(appearance);
-                inboxWindow.Closed += (_, _) => inboxWindow = null;
-            }
-            inboxWindow.Activate();
-            if (AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter) presenter.Minimize();
-        }
-        catch (Exception error)
-        {
-            Show("无法打开敏感收件小窗", $"窗口错误代码：0x{error.HResult:X8}。", InfoBarSeverity.Error);
-        }
+        try { ((App)Application.Current).OpenInbox(false, true); }
+        catch (Exception error) { Show("无法打开敏感收件小窗", $"窗口错误代码：0x{error.HResult:X8}。", InfoBarSeverity.Error); }
     }
+
     private async void TestFilter_Click(object sender, RoutedEventArgs e)
     {
         if (busy) return;
@@ -307,7 +291,7 @@ public sealed partial class MainWindow : Window
         Root.RequestedTheme = appearance.Theme == "dark" ? ElementTheme.Dark : appearance.Theme == "light" ? ElementTheme.Light : ElementTheme.Default;
         Navigation.FontSize = appearance.FontSize; Root.Resources["ControlContentThemeFontSize"] = (double)appearance.FontSize;
         ApplyCaptionTheme();
-        inboxWindow?.ApplyAppearance(appearance);
+        ((App)Application.Current).ApplyPopupAppearance(appearance);
     }
     private void ApplyCaptionTheme()
     {
@@ -336,30 +320,27 @@ public sealed partial class MainWindow : Window
         catch { Show("自启设置未完成", "启动项可能被其他目标占用，或系统限制了写入权限。现有启动项未被覆盖。", InfoBarSeverity.Error); ReadStartup(); }
     }
     private async void WindowsStartup_Click(object sender, RoutedEventArgs e) { try { await Windows.System.Launcher.LaunchUriAsync(new Uri("ms-settings:startupapps")); } catch { Show("无法打开系统设置", "可从 Windows 设置 → 应用 → 启动查看。", InfoBarSeverity.Warning); } }
-    private async void History_Expanding(Expander sender, ExpanderExpandingEventArgs args) { if (initialized && !busy) await LoadHistory(); }
-    private async Task LoadHistory()
+    private async void History_Expanding(Expander sender, ExpanderExpandingEventArgs args) { if (initialized) await HistoryContents.Refresh(); }
+    private ulong shortcutRevision;
+    private void LoadShortcuts()
     {
+        HistoryShortcutBox.Text = ShortcutText.Format(config?.Shortcuts.History);
+        InboxShortcutBox.Text = ShortcutText.Format(config?.Shortcuts.Inbox);
+        shortcutRevision = revision;
+    }
+    private async void SaveShortcuts_Click(object sender, RoutedEventArgs e)
+    {
+        if (busy || !running || config is null) return;
         try
         {
-            var result = await agent.Call("listHistory", new { offset = historyOffset, query = HistorySearch.Text, favorites = HistoryScope.SelectedIndex == 1 }); if (closed) return;
-            historyTotal = result.GetProperty("total").GetInt32(); history = result.GetProperty("items").EnumerateArray().Select(item => new HistoryRow { Id = item.GetProperty("id").GetString()!, Preview = item.GetProperty("preview").GetString()!, Favorite = item.GetProperty("favorite").GetBoolean(), Detail = $"{Time(item.GetProperty("timestamp").GetInt64())} · {(item.GetProperty("direction").GetString() == "upload" ? "发送" : "接收")}" }).ToList();
-            HistoryList.ItemsSource = history; EmptyHistory.Visibility = history.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-            PreviousHistory.IsEnabled = historyOffset > 0; NextHistory.IsEnabled = historyOffset + 20 < historyTotal;
-            HistoryCount.Text = historyTotal == 0 ? "0 条" : $"{Math.Min(historyOffset + 1, historyTotal)}–{Math.Min(historyOffset + 20, historyTotal)} / {historyTotal}";
+            var updated = config.Copy();
+            updated.Shortcuts = new() { History = ShortcutText.Parse(HistoryShortcutBox.Text), Inbox = ShortcutText.Parse(InboxShortcutBox.Text) };
+            if (updated.Shortcuts.History is not null && updated.Shortcuts.History == updated.Shortcuts.Inbox) throw new FormatException();
+            if (await Action("updateSettings", new { config = updated, expectedRevision = shortcutRevision, rebindShortcuts = true })) LoadShortcuts();
         }
-        catch (Exception error) { Error(error); }
+        catch (FormatException) { Show("快捷键格式无效", "请输入如 Ctrl+Alt+H 的组合；两个功能不能使用同一组合。", InfoBarSeverity.Warning); }
     }
-    private async void SearchHistory_Click(object sender, RoutedEventArgs e) { if (busy) return; historyOffset = 0; await LoadHistory(); }
-    private async void PreviousHistory_Click(object sender, RoutedEventArgs e) { if (busy) return; historyOffset = Math.Max(0, historyOffset - 20); await LoadHistory(); }
-    private async void NextHistory_Click(object sender, RoutedEventArgs e) { if (busy) return; historyOffset += 20; await LoadHistory(); }
-    private async void CopyHistory_Click(object sender, RoutedEventArgs e) { if ((sender as Button)?.Tag is string id) await Action("copyHistory", new { id }); }
-    private async void DeleteHistory_Click(object sender, RoutedEventArgs e) { if (busy) return; if ((sender as Button)?.Tag is string id) { await Action("deleteHistory", new { id }); await LoadHistory(); } }
-    private async void FavoriteHistory_Click(object sender, RoutedEventArgs e) { if (busy) return; if ((sender as Button)?.Tag is string id) { var item = history.FirstOrDefault(i => i.Id == id); if (item is not null) { await Action("setFavorite", new { id, favorite = !item.Favorite }); await LoadHistory(); } } }
-    private async void ClearHistory_Click(object sender, RoutedEventArgs e)
-    {
-        if (busy || !await Confirm("清空本地历史？", "将删除本机全部普通历史和收藏。不会清空系统剪贴板、敏感收件区、同步游标或设备身份。", "清空历史")) return;
-        await Action("clearHistory"); historyOffset = 0; await LoadHistory();
-    }
+    private async void ReloadShortcuts_Click(object sender, RoutedEventArgs e) { if (!busy) { await Refresh(); LoadShortcuts(); } }
     private async void CopyInbox_Click(object sender, RoutedEventArgs e)
     {
         var id = inboxId;
