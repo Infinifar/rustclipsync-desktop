@@ -6,6 +6,10 @@ on:
         description: Workflow run containing the setup artifact
         required: true
         default: '41194209572'
+      rebuild_ui:
+        description: Rebuild UI and packaging, reusing the already compiled Rust agent
+        type: boolean
+        default: false
 permissions:
   contents: read
   actions: read
@@ -29,6 +33,20 @@ jobs:
           $setup = Get-ChildItem downloaded -Recurse -Filter 'RustClipSync-*-setup-x64.exe' | Select-Object -First 1
           if (!$setup) { throw 'No installer in artifact' }
           Copy-Item $setup.FullName dist/installer
+      - name: Rebuild UI and installer with the existing background executable
+        if: inputs.rebuild_ui
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $setup = Get-Item 'dist/installer/RustClipSync-*-setup-x64.exe'
+          $seed = Join-Path $env:RUNNER_TEMP 'RustClipSync-build-seed'
+          $install = Start-Process $setup.FullName -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/TASKS=',"/DIR=`"$seed`"") -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw 'Unable to recover the compiled background executable' }
+          New-Item -ItemType Directory -Force target/release | Out-Null
+          Copy-Item "$seed/rustclipsync-agent.exe" target/release
+          $remove = Start-Process "$seed/unins000.exe" -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru
+          if ($remove.ExitCode -ne 0) { throw 'Seed cleanup failed' }
+          ./scripts/build-windows.ps1
       - name: Exercise the installed app and collect startup diagnostics
         shell: pwsh
         run: ./scripts/test-windows-install.ps1
@@ -39,3 +57,5 @@ jobs:
           path: |
             dist/installer/*.png
             dist/installer/*.log
+            dist/installer/*.exe
+            dist/installer/SHA256SUMS
