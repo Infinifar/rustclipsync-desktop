@@ -45,7 +45,7 @@ try {
         if ($launcher.HasExited) { Write-Output "Launcher exit: $($launcher.ExitCode)" }
         Get-Process -Name RustClipSync -ErrorAction SilentlyContinue | Select-Object Id,MainWindowTitle,MainWindowHandle,Path | Format-List
         Get-WinEvent -FilterHashtable @{LogName='Application';StartTime=(Get-Date).AddMinutes(-15)} -ErrorAction SilentlyContinue |
-            Where-Object { $_.ProviderName -in @('.NET Runtime','Application Error','SideBySide','Windows Error Reporting') } |
+            Where-Object { $_.ProviderName -in @('.NET Runtime','Application Error','SideBySide','Windows Error Reporting') -and $_.Message -match 'RustClipSync|Microsoft.ui.Xaml|WindowsAppRuntime' } |
             Select-Object -First 10 TimeCreated,ProviderName,Message | Format-List
         Get-ChildItem $destination | Select-Object Name,Length | Format-Table
         Copy-Item $log "$root/dist/installer/install.log" -ErrorAction SilentlyContinue

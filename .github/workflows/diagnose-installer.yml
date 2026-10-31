@@ -1,0 +1,41 @@
+name: Diagnose installed Windows app
+on:
+  workflow_dispatch:
+    inputs:
+      source_run:
+        description: Workflow run containing the setup artifact
+        required: true
+        default: '41194209572'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  diagnose:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Download the already built installer
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN: ${{ inputs.source_run }}
+        run: |
+          gh run download $env:SOURCE_RUN --repo $env:GITHUB_REPOSITORY --name rustclipsync-windows-x64-setup --dir downloaded
+          if ($LASTEXITCODE -ne 0) { throw 'Download failed' }
+          New-Item -ItemType Directory -Force dist/installer | Out-Null
+          $setup = Get-ChildItem downloaded -Recurse -Filter 'RustClipSync-*-setup-x64.exe' | Select-Object -First 1
+          if (!$setup) { throw 'No installer in artifact' }
+          Copy-Item $setup.FullName dist/installer
+      - name: Exercise the installed app and collect startup diagnostics
+        shell: pwsh
+        run: ./scripts/test-windows-install.ps1
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: installed-app-diagnostics
+          path: |
+            dist/installer/*.png
+            dist/installer/*.log
