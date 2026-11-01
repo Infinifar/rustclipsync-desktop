@@ -1,5 +1,7 @@
 <p><img src="assets/omaclipsync.svg" alt="RustClipSync 图标" width="64" height="64"></p>
 
+当前同步统一使用共享核心 rustclipsync-core 0.3.0 的 `/api/...` 接口；服务端与各客户端需要配套更新。
+
 # RustClipSync Desktop
 
 [English](README.md) | 简体中文
@@ -41,6 +43,6 @@ Windows 使用系统共享运行库，缺少依赖时提供微软官方下载入
 
 在主分支更新版本并添加对应的英文发布说明，即可触发正式发布；普通提交只运行 CI，也可在 Actions 手动构建。已发布版本的说明文件更新后会同步到 Release 页面。详见 [发布流程](RELEASING.md)、[验证记录](VALIDATION.md) 与 [后台开发说明](agent/README.md)。
 
-相关项目：[服务端](https://github.com/Infinifar/rustclipsync-server) · [接口协议](https://github.com/Infinifar/rustclipsync-server/blob/main/PROTOCOL-V1.md) · [Android 输入法](https://github.com/Infinifar/fcitx5-android-bibi-keyboard) · [Omaclipsync](https://github.com/Infinifar/omaclipsync)
+相关项目：[服务端](https://github.com/Infinifar/rustclipsync-server) · [接口协议](https://github.com/Infinifar/rustclipsync-server/blob/main/PROTOCOL.md) · [Android 输入法](https://github.com/Infinifar/fcitx5-android-bibi-keyboard) · [Omaclipsync](https://github.com/Infinifar/omaclipsync)
 
 MIT 许可证；第三方组件见 [THIRD-PARTY.md](THIRD-PARTY.md)。

@@ -123,7 +123,7 @@
        </Expander>
        <StackPanel Orientation="Horizontal" Spacing="10"><Button x:Name="SaveSettingsButton" Content="保存同步设置" Style="{ThemeResource AccentButtonStyle}" Click="SaveSettings_Click" AutomationProperties.AutomationId="SaveSyncSettings"/><Button AutomationProperties.AutomationId="ReloadSettings" Content="重新载入" Click="ReloadSettings_Click"/></StackPanel>
        <Expander Header="关于与诊断" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
-        <StackPanel Spacing="12"><TextBlock Text="RustClipSync 0.3.3" FontWeight="SemiBold"/><TextBlock Text="与 Android 输入法和 Omaclipsync 使用同一同步协议。界面关闭后，后台同步独立运行。" Style="{StaticResource Note}"/>
+        <StackPanel Spacing="12"><TextBlock Text="RustClipSync 0.4.0" FontWeight="SemiBold"/><TextBlock Text="与 Android 输入法和 Omaclipsync 使用同一同步协议。界面关闭后，后台同步独立运行。" Style="{StaticResource Note}"/>
          <StackPanel Orientation="Horizontal" Spacing="8"><HyperlinkButton Content="服务端" NavigateUri="https://github.com/Infinifar/rustclipsync-server"/><HyperlinkButton Content="Android 输入法" NavigateUri="https://github.com/Infinifar/fcitx5-android-bibi-keyboard"/><HyperlinkButton Content="Omaclipsync" NavigateUri="https://github.com/Infinifar/omaclipsync"/></StackPanel>
          <Button Content="导出脱敏诊断" Click="Diagnostics_Click"/><TextBlock x:Name="DiagnosticsResult" IsTextSelectionEnabled="True" Style="{StaticResource Note}"/>
         </StackPanel>

@@ -1,5 +1,7 @@
 <p><img src="assets/omaclipsync.svg" alt="RustClipSync icon" width="64" height="64"></p>
 
+Current synchronization uses the `/api/...` endpoints from rustclipsync-core 0.3.0. Update the server and clients together.
+
 # RustClipSync Desktop
 
 English | [简体中文](README-zh.md)
@@ -41,6 +43,6 @@ Local state and history are encrypted, with the master key protected by Windows 
 
 To publish a new version, update the version metadata and add its release notes in English on the main branch. Other commits run CI without publishing a new version; manual builds are also available in Actions. Updates to an existing release notes file are synced to the published release. See the [release process (Chinese)](RELEASING.md), [validation records (Chinese)](VALIDATION.md) and [agent development notes (Chinese)](agent/README.md).
 
-Related projects: [Server](https://github.com/Infinifar/rustclipsync-server) · [Protocol](https://github.com/Infinifar/rustclipsync-server/blob/main/PROTOCOL-V1.md) · [Android keyboard](https://github.com/Infinifar/fcitx5-android-bibi-keyboard) · [Omaclipsync](https://github.com/Infinifar/omaclipsync)
+Related projects: [Server](https://github.com/Infinifar/rustclipsync-server) · [Protocol](https://github.com/Infinifar/rustclipsync-server/blob/main/PROTOCOL.md) · [Android keyboard](https://github.com/Infinifar/fcitx5-android-bibi-keyboard) · [Omaclipsync](https://github.com/Infinifar/omaclipsync)
 
 Licensed under MIT. Third-party components are listed in [THIRD-PARTY.md](THIRD-PARTY.md).

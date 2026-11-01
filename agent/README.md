@@ -1,5 +1,7 @@
 # Windows Rust 后台
 
+Current synchronization uses the `/api/...` endpoints from rustclipsync-core 0.3.0. Update the server and clients together.
+
 `rustclipsync-agent` 是普通用户会话进程，复用 `rustclipsync-core` 0.2.0。同步、剪贴板、状态/历史加密、游标与本地控制由 Rust 负责；WinUI 窗口关闭后，后台独立运行。
 
 ## 功能与数据

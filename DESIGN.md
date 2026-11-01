@@ -67,7 +67,7 @@ rustclipsync-destop/
 
 ## 同步行为与防重复
 
-以 [现有 HTTP 协议](https://github.com/Infinifar/rustclipsync-server/blob/main/PROTOCOL-V1.md) 为准：
+以 [现有 HTTP 协议](https://github.com/Infinifar/rustclipsync-server/blob/main/PROTOCOL.md) 为准：
 
 1. 一次真实复制生成一个随机 UUID；网络重试使用同一个 UUID，不能重新生成。
 2. revision 决定服务端顺序，epoch 区分服务端状态世代。时间戳只做过期校验，不使用“时间戳加三位随机数”作为唯一性或排序依据。

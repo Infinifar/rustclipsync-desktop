@@ -1063,7 +1063,7 @@ dependencies = [
 
 [[package]]
 name = "rustclipsync-agent"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "dbus",
  "dbus-secret-service",
@@ -1084,7 +1084,7 @@ dependencies = [
 
 [[package]]
 name = "rustclipsync-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "base64 0.22.1",
  "regex",
