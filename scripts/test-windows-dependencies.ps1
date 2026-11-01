@@ -41,7 +41,11 @@ function Test-MissingRuntimeDialog([string]$Name, [string]$Expected, [hashtable]
                     $bitmap.Save("$root/dist/installer/missing-$Name.png",[Drawing.Imaging.ImageFormat]::Png)
                     $graphics.Dispose(); $bitmap.Dispose()
                 }
-                $window.GetCurrentPattern([Windows.Automation.WindowPattern]::Pattern).Close()
+                # The SDK's Yes/No dialog disables its title-bar close action.
+                # Cancel explicitly so this test never opens a download browser.
+                $cancel = $buttons | Where-Object { $_.Current.Name.Replace('&','') -match '^(No|Cancel|否.*|取消.*)$' } | Select-Object -First 1
+                if (!$cancel) { throw "$Name prompt does not provide a cancellation button" }
+                $cancel.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
                 $found = $true; break
             }
         } while (!$found -and (Get-Date) -lt $deadline)
