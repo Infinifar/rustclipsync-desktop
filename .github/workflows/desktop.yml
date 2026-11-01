@@ -1,0 +1,97 @@
+name: Desktop CI / Release
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish this version after all platform checks pass
+        type: boolean
+        default: false
+      cleanup_failed:
+        description: Remove failed and timed-out runs after publishing
+        type: boolean
+        default: true
+permissions:
+  contents: read
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  version:
+    name: Version and release plan
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      publish: ${{ steps.plan.outputs.publish }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check metadata and release assembly rules
+        run: python3 -m unittest discover -s scripts -p 'test_release.py' -v
+      - name: Plan this build
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUEST_PUBLISH: ${{ inputs.publish }}
+        run: python3 scripts/release.py check --github-output "$GITHUB_OUTPUT"
+  windows:
+    name: Windows
+    needs: version
+    uses: ./.github/workflows/windows.yml
+  linux:
+    name: Linux
+    needs: version
+    uses: ./.github/workflows/linux.yml
+  publish:
+    name: Publish Windows and Linux release
+    needs: [version, windows, linux]
+    if: needs.version.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    concurrency:
+      group: release-${{ needs.version.outputs.version }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: rustclipsync-*
+          path: dist/downloaded
+      - name: Assemble the five verified installers and unified checksums
+        run: python3 scripts/release.py prepare --artifacts dist/downloaded --output dist/release
+      - name: Publish only after the draft contains every expected asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/release.py publish --assets dist/release
+      - name: Preserve the release files as build artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rustclipsync-release-${{ needs.version.outputs.version }}
+          path: dist/release/
+          if-no-files-found: error
+  cleanup:
+    name: Clean failed builds
+    needs: publish
+    if: github.event_name != 'workflow_dispatch' || inputs.cleanup_failed
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Delete completed failed runs and their artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/release.py cleanup

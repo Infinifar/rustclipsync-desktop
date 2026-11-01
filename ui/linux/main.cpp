@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
     // Keep system Qt Quick controls; no browser engine or desktop shell dependency.
     QQuickStyle::setStyle("Fusion");
     QGuiApplication app(argc, argv);
-    app.setApplicationName("rustclipsync"); app.setOrganizationName("Infinifar"); app.setApplicationVersion("0.2.3");
+    app.setApplicationName("rustclipsync"); app.setOrganizationName("Infinifar"); app.setApplicationVersion("0.3.0");
     app.setWindowIcon(QIcon("qrc:/assets/rustclipsync.png"));
     QCommandLineParser parser; parser.addHelpOption(); parser.addVersionOption();
     parser.addOptions({{"history", "Toggle the history window"}, {"inbox", "Toggle the masked sensitive inbox"}, {"data-dir", "Use an isolated absolute profile directory", "directory"}, {"smoke-test", "Run isolated QML checks without starting a background agent"}, {"integration-test", "Verify commands against a disposable native agent"}, {"capture", "Save an isolated UI verification screenshot", "file"}, {"page", "Initial page for UI verification (0-3)", "number", "0"}, {"width", "Initial window width", "pixels", "760"}});

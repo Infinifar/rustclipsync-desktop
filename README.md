@@ -2,93 +2,42 @@
 
 # RustClipSync Desktop
 
-Windows 11 与 Linux 桌面剪贴板同步客户端，共用 Rust 后台及 [rustclipsync-core](https://github.com/Infinifar/rustclipsync-core)。Windows 使用 **WinUI 3 / C# / XAML**，Linux 使用 **Qt 6/QML** 独立界面。关闭界面后，已启动的 Rust 后台继续同步。
+轻量的 Windows 11 / Linux 文本剪贴板同步客户端，复用 [rustclipsync-core](https://github.com/Infinifar/rustclipsync-core)。Windows 使用 WinUI 3，Linux 使用 Qt 6/QML；关闭界面后，Rust 后台继续同步。
 
-Linux 的支持范围、编译、安装包和快捷键配置见 [Linux 使用说明](LINUX.md)。Windows 的原生界面、托盘、自启和全局快捷键保留。
+## 下载与使用
 
-## 页面与功能
+从 [正式发布页](https://github.com/Infinifar/rustclipsync-desktop/releases/latest) 下载对应安装包，发布页附有统一的 `SHA256SUMS`。
 
-布局参考 [Omaclipsync](https://github.com/Infinifar/omaclipsync)，使用 Windows 原生导航、按钮、输入框和主题控件。
-
-| 页面 | 功能 |
+| 平台 | 安装包 |
 | --- | --- |
-| 主页 | 实际连接状态、服务端、设备身份、最近同步、待办；发送、接收、暂停/恢复、退出后台；双向/仅发送/仅接收；敏感收件区与历史 |
-| 外观 | 跟随系统、浅色、深色主题；标准/较大/大字号，立即应用并保存 |
-| 快捷键 | 自定义全局组合，打开/关闭历史窗口与敏感收件小窗，清空可解除绑定 |
-| 设置 | 服务端与账户配对、敏感策略、正则过滤及测试、备用检查间隔、历史条数/期限、登录自启、关于及脱敏诊断 |
+| Windows 11 x64 | `RustClipSync-版本-setup-x64.exe`，按用户安装 |
+| Debian 12 / Ubuntu 24.04 基线 | 对应发行版的 `.deb` |
+| Fedora 43 基线 | `.rpm` |
+| Arch / Omarchy | `.pkg.tar.zst` |
 
-普通历史支持搜索、分页、复制、收藏、删除及清空。当前配对的过期数据在后台运行时清理。收藏最多 50 条，保留至手动删除；普通历史默认最多 50 条、保留 7 天，可调整为 1–1000 条和 1–365 天。历史默认关闭，单条最多 1 MiB、总正文最多 16 MiB，超限不会回滚已完成的同步。
+安装后打开“设置”，填写 HTTPS 服务端地址、账户和密码即可配对。Linux 安装命令、桌面要求和快捷键配置见 [Linux 使用说明](LINUX.md)。Wayland 需要 data-control 支持；缺少该协议的 GNOME/Wayland 会话暂不支持。
 
-同步使用共享 [rustclipsync-core](https://github.com/Infinifar/rustclipsync-core)。消息由 UUID、epoch、revision 与持久化游标控制，离线只同步最后一条，清空剪贴板或重启不会重放已消费内容。手动接收也不会恢复已经消费的旧值。首次启动不上传已有剪贴板。当前仅支持文本，最大 10 MiB，不支持旧 SyncClipboard 协议。
+Windows 安装包目前未签名，签名进度见 [签名政策](CODE-SIGNING.md)。
 
-## 安装与升级
+## 功能
 
-下载 [Windows x64 0.2.3 安装包](https://github.com/Infinifar/rustclipsync-desktop/releases/tag/v0.2.3)，下载并运行 **RustClipSync-0.2.3-setup-x64.exe**。发布页附有 SHA256SUMS，实际运行截图见构建产物。当前为未签名开发安装包。
+- **文本同步**：双向、仅发送或仅接收；离线只同步最后一条，持久化游标和消息 ID 防止重复处理。单条文本最大 10 MiB。
+- **敏感收件区**：默认遮罩，支持显示、复制、删除及独立置顶小窗；敏感文本自动写入系统剪贴板默认关闭。
+- **加密历史**：支持搜索、分页、收藏与清理，默认关闭；开启后默认保留 7 天，可调整期限和条数。敏感正文不进入普通历史。
+- **桌面集成**：主题、字号、登录自启；Windows 提供托盘和全局快捷键，Linux 可通过桌面快捷键打开历史或敏感小窗。
 
-按用户安装，默认无需管理员权限，内含 .NET、WinUI 和应用本地 C++ 运行组件。安装后从开始菜单打开，进入“设置 → 服务端与账户”，填写 HTTPS 根地址、用户名和密码，点击“连接并启动”。
+## 隐私
 
-已有 0.1.0 / 0.2.x 配对可以直接覆盖升级：配置、DPAPI 密钥、设备身份和同步游标会保留。已有 `autoApplySensitive` 设置保留原值；旧配置缺少该字段时默认关闭，保留原有的手动收件行为。不要删除数据目录来解决连接问题。改变账户或重新输入密码会请求确认重新配对，该操作会放弃待发送内容与当前敏感收件项。
+“同步已标记的敏感文本”默认关闭。部分应用可能不标记敏感内容，因此不能识别所有敏感信息。
 
-## 主页敏感收件区
+本机状态与历史加密保存，主密钥由 Windows DPAPI 或 Linux Secret Service 保护。密码不写入配置或命令行，日志与普通状态不包含剪贴板正文。HTTPS 保护传输，服务端仍可读取同步内容；当前没有端到端加密。删除收件项只作用于本机，不重置接收游标。
 
-主页始终显示敏感收件区；没有收件项时显示空状态，后台不可用时显示读取状态。空状态禁用复制、显示和删除，保留“自动写入设置”入口。
+## 开发与发布
 
-操作按一行排列：**复制到剪贴板 → 显示 / 隐藏 → 删除 → 自动写入设置**。正文默认遮罩，点击“显示”才读取最多 64 KiB；离开主页、窗口失去焦点、后台不可用或收件项更新时重新隐藏。复制仍由 Rust 按当前消息 ID 写入完整原文，并保留敏感及来源标记。独立小窗沿用相同的有界预览读取逻辑。
+[Desktop CI / Release](.github/workflows/desktop.yml) 是统一构建入口，并行验证 Windows 和四种 Linux 发行版。全部检查通过后，将安装包与校验和发布到同一个 GitHub Release。
 
-## 敏感收件小窗
+在主分支更新版本并添加对应发布说明，即可触发正式发布；普通提交只运行 CI，也可在 Actions 手动构建。详见 [发布流程](RELEASING.md)、[验证记录](VALIDATION.md) 与 [后台开发说明](agent/README.md)。
 
-在主页敏感收件区点击文本按钮 **以小窗显示**，主窗口会自动最小化，打开标题为“敏感收件区”的独立原生窗口。小窗默认遮罩正文，右侧可点击“显示 / 隐藏”，下面显示收到时间，并提供“复制到剪贴板”和“删除”。右上角可置顶 / 取消置顶；再次打开复用已有小窗。关闭小窗不停止后台同步。
+相关项目：[服务端](https://github.com/Infinifar/rustclipsync-server) · [接口协议](https://github.com/Infinifar/rustclipsync-server/blob/main/PROTOCOL-V1.md) · [Android 输入法](https://github.com/Infinifar/fcitx5-android-bibi-keyboard) · [Omaclipsync](https://github.com/Infinifar/omaclipsync)
 
-小窗只在明确点击“显示”后读取正文，收到新的收件项时重新隐藏。为限制界面内存，较长内容最多显示开头 64 KiB，复制按钮仍复制完整原文。删除只移除本机收件项，不重置接收游标，不删除服务端内容，也不会清除已经复制到系统剪贴板的内容。
-
-## 全局快捷键
-
-在 **快捷键** 页填写组合键名称，例如历史 `Ctrl+Alt+H`、敏感收件小窗 `Ctrl+Alt+I`，点击 **保存快捷键**。默认两项都未绑定；清空后保存即可解除绑定。输入名称即可，不是按键录制。可用 Ctrl、Alt、Shift、Win 加字母、数字或 F1–F24（不含 F12），至少包含 Ctrl、Alt 或 Win。两个功能不能使用相同组合。
-
-快捷键由 Rust 后台使用 Windows RegisterHotKey 注册，无全键盘钩子；后台运行时，主窗口关闭也可使用。第一次按打开对应的独立窗口，再次按关闭；长按不会反复触发。敏感小窗仍默认隐藏内容，快捷键不读取或复制正文。打开敏感小窗时，已有主窗口自动最小化。历史窗口与主页历史面板共用搜索、分页、复制、收藏、删除和清空操作，不会自动开启历史记录。
-
-被系统或其他应用占用的组合会报错，旧绑定与配置保留。启动时注册失败不影响同步，快捷键页会显示状态；释放冲突后重新保存可重试。退出后台会释放绑定；登录自启开启时，后台启动会加载已保存的组合。
-
-主页的“连接设置”和“退出后台”位于敏感收件区下方。界面按同一登录会话、安装目录和数据目录复用实例，热键打开的窗口会响应再次触发的关闭操作。
-
-## 开机自启
-
-在 **设置 → 开机自启与后台** 中启用“登录 Windows 后自动启动同步”。程序管理当前用户启动文件夹里的 `RustClipSync.lnk`，目标为后台的 `autostart` 模式；登录后只启动后台，并保留暂停状态，不打开主窗口。
-
-关闭开关会移除该应用的启动项，不停止当前同步。自启统一由应用设置管理，安装器不另外保存一份开关。Windows 的启动应用设置和组织策略可能限制实际启动，可使用页面内按钮打开系统设置查看。卸载会清理该启动项，同时保留 `%LOCALAPPDATA%\RustClipSync` 的配对与加密数据。
-
-## 隐私与安全
-
-- **同步已标记的敏感文本**默认关闭。部分应用可能不标记敏感内容，因此不能识别所有敏感信息。
-- 开启敏感同步后，默认只将收到的敏感文本存入加密收件区，供手动复制；关闭历史时仍可使用当前收件项。
-- 在 **设置 → 同步与隐私** 可开启 **自动将收到的敏感文本写入系统剪贴板**，也可从敏感收件区的“自动写入设置”进入。该选项默认关闭，必须同时开启敏感同步并保存设置。开启后，新收到的敏感文本直接写入系统剪贴板，不另存到收件区或普通历史。切换选项不会补写已有收件项或重置接收游标。
-- 敏感收件项使用专用复制入口，不复用普通历史的复制流程。手动和自动写入均携带消息来源标记，防止同步回环，并请求 Windows 排除剪贴板历史和云同步；这些标记不能阻止其他应用读取当前系统剪贴板。
-- 默认收件模式将正文与接收游标在同一次加密提交中保存，并向服务端确认 `skipped`；自动模式在实际写入系统剪贴板后确认 `applied`，沿用持久化日志与去重机制。收件区只保留最后一项，按设置的保留天数清理。关闭敏感同步不自动删除已有收件项，可手动删除。
-- 普通历史排除敏感正文，使用 AES-256-GCM 独立加密；主密钥由当前用户 DPAPI 保护。历史默认关闭，停用后不再新增，已有记录继续按期限清理。清空历史不会重置同步游标、设备身份或敏感收件项。
-- 配对密码通过子进程的匿名标准输入传递，不进入参数、环境变量或配置文件。日常同步使用设备令牌；令牌与待办正文加密保存。
-- UI 与后台通过当前登录会话 ACL 限制的本机 Named Pipe 通信，并检查对端进程会话与安装位置。状态不含正文或设备令牌，日志不记录正文，诊断导出仅包含固定状态与版本。
-- HTTPS 保护传输，服务端仍可读取正文；当前没有端到端加密。DPAPI 与通道 ACL 不能防御同一用户权限的恶意软件，也不承诺在 SSD 上物理擦除已删除内容。
-
-## 开发与验证
-
-- [验证记录](VALIDATION.md)：原生、配置迁移、剪贴板、IPC、UI 和安装检查及范围限制。
-- [设计](DESIGN.md)、[实施计划](DEVELOPMENT-PLAN.md)、[本地通信契约](IPC.md)。
-- [后台使用](agent/README.md)。
-
-构建使用 Rust 1.99.1 MSVC、.NET 10、Windows App SDK 2.6.4、Windows SDK 与 Inno Setup 6：先 `cargo build --locked --release --bin rustclipsync-agent`，再执行 `./scripts/build-windows.ps1`。UI 依赖由 NuGet 锁文件固定；共享核心以逐文件 SHA-256 的生成源码快照消费，不手改快照。
-
-当前仓库 [Infinifar/rustclipsync-desktop](https://github.com/Infinifar/rustclipsync-desktop) 以 MIT 许可证公开开源；本地目录沿用 `rustclipsync-destop`。服务端和 Android 协议保持兼容，Android 使用 Kotlin 实现同一协议。
-
-相关项目：[服务端](https://github.com/Infinifar/rustclipsync-server) · [HTTP 接口协议](https://github.com/Infinifar/rustclipsync-server/blob/main/PROTOCOL-V1.md) · [Android 输入法](https://github.com/Infinifar/fcitx5-android-bibi-keyboard) · [Omaclipsync](https://github.com/Infinifar/omaclipsync)。
-
-## Code signing policy
-
-当前安装包未签名，正在评估 SignPath Foundation，尚未获批。详见 [签名政策](CODE-SIGNING.md)、[申请评估与材料](SIGNPATH-ASSESSMENT.md) 和 [第三方组件](THIRD-PARTY.md)。
-
-## SSH 私钥文本未同步的排查
-
-文本传输上限为 10 MiB，代码不会因为文本包含 OpenSSH / PEM 私钥头部而拒绝同步。复制文件本身不属于文本同步，需要复制文本内容。敏感属性来自源应用提供的剪贴板标记，并不根据私钥头部自动识别。
-
-Omaclipsync 发送端和 Windows 接收端均需允许敏感同步，并保存设置。Windows 关闭自动写入时，标记内容只进入收件区，不自动改变系统剪贴板；无标记文本则走普通同步。已被策略跳过或已消费的消息不会因修改设置而补发，需要重新复制形成新事件，或从发送端明确手动发送。另需检查暂停、同步方向和过滤规则。
-
-本轮用独立服务端、临时数据库测试了约 4 KiB / 40 KiB / 530 KiB 的多行私钥样式文本，带标记和不带标记六组均逐字节一致；Windows 原生剪贴板测试另验证多行私钥样式文本完整写入。这些测试不使用真实私钥，也不代表已定位某次实机同步失败的具体原因。
+MIT 许可证；第三方组件见 [THIRD-PARTY.md](THIRD-PARTY.md)。

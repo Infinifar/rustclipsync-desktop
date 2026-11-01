@@ -23,7 +23,8 @@ Wayland 会话不会回退为 XWayland 并宣称可以监控整个桌面。只�
 
 ## 安装与启动
 
-在 GitHub Actions 的 **Linux desktop** 构建产物中下载匹配发行版的包。
+从 [正式发布页](https://github.com/Infinifar/rustclipsync-desktop/releases/latest) 下载匹配发行版的包。
+开发构建统一位于 Actions 的 **Desktop CI / Release** 中。
 首次使用需启动并解锁支持 Secret Service 的桌面密钥环，例如 GNOME Keyring
 或启用了对应接口的 KWallet。没有密钥环时不会回退为明文密钥文件。
 
