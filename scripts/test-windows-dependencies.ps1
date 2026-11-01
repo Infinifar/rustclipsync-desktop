@@ -28,7 +28,7 @@ function Test-MissingRuntimeDialog([string]$Name, [string]$Expected, [hashtable]
             foreach ($window in $windows) {
                 $elements = $window.FindAll([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.Condition]::TrueCondition)
                 $text = $window.Current.Name + "`n" + (($elements | ForEach-Object { $_.Current.Name }) -join "`n")
-                $buttons = @($elements | Where-Object { $_.Current.ControlType -eq [Windows.Automation.ControlType]::Button })
+                $buttons = @($elements | Where-Object { $_.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and $_.Current.IsEnabled -and !$_.Current.IsOffscreen })
                 if ($text -notmatch $Expected -or !($buttons | Where-Object { $_.Current.Name -match 'Download|Install|Yes|下载|安装|是' })) { continue }
                 [IO.File]::WriteAllText("$root/dist/installer/missing-$Name.txt", $text)
                 $rect = $window.Current.BoundingRectangle
@@ -44,7 +44,8 @@ function Test-MissingRuntimeDialog([string]$Name, [string]$Expected, [hashtable]
                 # The SDK's Yes/No dialog disables its title-bar close action.
                 # Cancel explicitly so this test never opens a download browser.
                 $cancel = $buttons | Where-Object { $_.Current.Name.Replace('&','') -match '^(No|Cancel|否.*|取消.*)$' } | Select-Object -First 1
-                if (!$cancel) { throw "$Name prompt does not provide a cancellation button" }
+                if (!$cancel) { $cancel = $buttons | Where-Object { $_.Current.Name.Replace('&','') -match '^(Close|关闭.*)$' } | Select-Object -First 1 }
+                if (!$cancel) { throw "$Name prompt does not provide a cancellation button: $(($buttons | ForEach-Object { $_.Current.Name }) -join ', ')" }
                 $cancel.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
                 $found = $true; break
             }
