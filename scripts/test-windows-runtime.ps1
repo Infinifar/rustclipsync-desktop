@@ -10,7 +10,17 @@ function Wait-HistoryCount([string]$Expected) {
 }
 function History-Rpc([string]$Method,[hashtable]$Parameters) {
     $request = @{id=[Guid]::NewGuid().ToString();ipcVersion=1;method=$Method;params=$Parameters} | ConvertTo-Json -Compress
-    $response = $request | & "$destination/rustclipsync-agent.exe" rpc | ConvertFrom-Json
+    # The CLI's pipe open is immediate, while the real WinUI client waits for
+    # an available instance. Retry only ERROR_PIPE_BUSY, before any request
+    # was sent; never replay a mutation after an ambiguous response failure.
+    $errorsPath = Join-Path $env:RUNNER_TEMP 'runtime-history-rpc-error.txt'
+    for ($attempt=0;$attempt -lt 15;$attempt++) {
+        $raw = $request | & "$destination/rustclipsync-agent.exe" rpc 2>$errorsPath
+        if ($LASTEXITCODE -eq 0) { break }
+        if ((Get-Content $errorsPath -Raw) -notmatch 'os error 231') { throw "History test transport failed: $Method" }
+        Start-Sleep -Milliseconds 100
+    }
+    $response = $raw | ConvertFrom-Json
     if ($LASTEXITCODE -ne 0 -or !$response.ok) { throw "History test operation failed: $Method" }
     return $response.result
 }
