@@ -9,6 +9,8 @@
 
 共享核心仍为 0.2.0，公开 API、协议和持久化格式兼容，客户端调用代码无需调整。依赖清单与解析版本未变，现有 `Cargo.lock` 可直接用于上述 `--locked` 检查，无需更新。本次只更新源码快照及验证记录，未构建发布安装包或执行桌面部署。
 
+后续同步共享核心的标准错误链与 Worker 生命周期 API：三个错误类型实现 `Display`、`std::error::Error` 及 `source()`，Worker 新增 `shutdown()`／`join()` 并保留原有 Drop 行为。更新后的实际 vendor 再次通过上述 24 项测试、两种 Clippy 检查和逐文件哈希校验；无需调整客户端调用或 Cargo.lock。
+
 # 0.3.2 Windows 与 Linux 正式发布验证
 
 [正式版本 v0.3.2](https://github.com/Infinifar/rustclipsync-desktop/releases/tag/v0.3.2)
