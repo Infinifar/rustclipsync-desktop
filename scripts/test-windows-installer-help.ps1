@@ -7,10 +7,18 @@ try {
     do {
         Start-Sleep -Milliseconds 300
         if ($wizard.HasExited) { throw 'Interactive setup exited before its download buttons were verified' }
-        $owners = @($wizard.Id) + @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$($wizard.Id)" | ForEach-Object ProcessId)
+        $owners = [Collections.Generic.HashSet[int]]::new()
+        $owners.Add($wizard.Id) | Out-Null
+        $processTree = @(Get-CimInstance Win32_Process)
+        do {
+            $added = $false
+            foreach ($child in $processTree) {
+                if ($owners.Contains([int]$child.ParentProcessId) -and $owners.Add([int]$child.ProcessId)) { $added = $true }
+            }
+        } while ($added)
         $windows = [Windows.Automation.AutomationElement]::RootElement.FindAll([Windows.Automation.TreeScope]::Children, [Windows.Automation.Condition]::TrueCondition)
         foreach ($window in $windows) {
-            if ($window.Current.ProcessId -notin $owners -or $window.Current.ClassName -ne 'TWizardForm') { continue }
+            if (!$owners.Contains($window.Current.ProcessId) -or $window.Current.ClassName -ne 'TWizardForm') { continue }
             $elements = $window.FindAll([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.Condition]::TrueCondition)
             $buttons = @($elements | Where-Object { $_.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and $_.Current.IsEnabled -and !$_.Current.IsOffscreen })
             $finish = $buttons | Where-Object { $_.Current.Name.Replace('&','') -match '^完成|^Finish$' } | Select-Object -First 1
@@ -32,7 +40,7 @@ try {
                 $finish.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
                 $verified = $true; break
             }
-            $accept = $elements | Where-Object { $_.Current.ControlType -eq [Windows.Automation.ControlType]::RadioButton -and $_.Current.Name.Replace('&','') -match '^我接受|^I accept' } | Select-Object -First 1
+            $accept = $elements | Where-Object { $_.Current.ControlType -eq [Windows.Automation.ControlType]::RadioButton -and $_.Current.Name.Replace('&','') -match '^我(?:接受|同意)|^I accept' } | Select-Object -First 1
             if ($accept) { $accept.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select() }
             $next = $buttons | Where-Object { $_.Current.Name.Replace('&','') -match '^下一步|^安装|^Next|^Install$' } | Select-Object -First 1
             if ($next) { $next.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke() }
@@ -46,6 +54,26 @@ try {
     }
     Write-Output 'PASS: actual installer finish page shows two non-overlapping official download buttons and dependency guidance.'
 } finally {
+    if (!$verified) {
+        # Preserve the actual wizard and control names when a hosted desktop's
+        # language or window ownership differs from the expected image.
+        try {
+            $snapshot = [Windows.Automation.AutomationElement]::RootElement.FindAll([Windows.Automation.TreeScope]::Children, [Windows.Automation.Condition]::TrueCondition)
+            $diagnostic = foreach ($window in $snapshot) {
+                "WINDOW $($window.Current.ProcessId) $($window.Current.ClassName) $($window.Current.Name)"
+                if ($window.Current.ClassName -eq 'TWizardForm') {
+                    $window.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition) | ForEach-Object { "  $($_.Current.ControlType.ProgrammaticName) enabled=$($_.Current.IsEnabled) $($_.Current.Name)" }
+                }
+            }
+            $diagnostic | Set-Content "$root/dist/installer/installer-help-controls.txt" -Encoding utf8
+            $diagnostic | Write-Output
+            $bitmap = [Drawing.Bitmap]::new([ScreenSize]::GetSystemMetrics(0),[ScreenSize]::GetSystemMetrics(1))
+            $graphics = [Drawing.Graphics]::FromImage($bitmap)
+            $graphics.CopyFromScreen(0,0,0,0,$bitmap.Size)
+            $bitmap.Save("$root/dist/installer/installer-help-failure.png",[Drawing.Imaging.ImageFormat]::Png)
+            $graphics.Dispose(); $bitmap.Dispose()
+        } catch { Write-Output "Unable to capture installer diagnostics: $_" }
+    }
     if (!$wizard.HasExited) { $wizard.Kill(); $wizard.WaitForExit() }
     $wizard.Dispose()
 }
