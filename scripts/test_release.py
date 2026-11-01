@@ -50,13 +50,14 @@ class ReleaseTests(unittest.TestCase):
             release.prepare_assets(self.fixture(duplicate=release.expected_assets("0.3.0")[2]), self.root / "release", "0.3.0")
 
     def test_mixed_ui_and_agent_versions_are_rejected(self):
+        version = release.check_versions()
         for name in release.VERSION_FILES:
             target = self.root / name
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(release.ROOT / name, target)
-        self.assertEqual(release.check_versions(self.root), "0.3.0")
+        self.assertEqual(release.check_versions(self.root), version)
         path = self.root / "ui/linux/main.cpp"
-        path.write_text(path.read_text().replace('setApplicationVersion("0.3.0")', 'setApplicationVersion("0.2.3")'))
+        path.write_text(path.read_text().replace(f'setApplicationVersion("{version}")', 'setApplicationVersion("999.0.0")'))
         with self.assertRaises(ValueError):
             release.check_versions(self.root)
 

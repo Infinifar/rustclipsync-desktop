@@ -1,5 +1,26 @@
 if ($env:GITHUB_ACTIONS -ne 'true' -or [string]::IsNullOrEmpty($env:RUNNER_TEMP) -or [string]::IsNullOrEmpty($destination)) { throw 'Run only from the disposable installer test.' }
 Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes
+Add-Type @'
+using System; using System.Runtime.InteropServices;
+public static class InstallerInput {
+    [StructLayout(LayoutKind.Sequential)] struct Mouse { public int x,y; public uint data,flags,time; public UIntPtr extra; }
+    [StructLayout(LayoutKind.Explicit)] struct Union { [FieldOffset(0)] public Mouse mouse; }
+    [StructLayout(LayoutKind.Sequential)] struct Input { public uint type; public Union value; }
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr window);
+    [DllImport("user32.dll")] static extern bool SetCursorPos(int x,int y);
+    [DllImport("user32.dll")] static extern uint SendInput(uint count,Input[] input,int size);
+    public static void Click(int x,int y) {
+        if(!SetCursorPos(x,y)) throw new Exception("Cannot position installer test input");
+        var input=new[] {new Input {value=new Union {mouse=new Mouse {flags=2}}},new Input {value=new Union {mouse=new Mouse {flags=4}}}};
+        if(SendInput(2,input,Marshal.SizeOf<Input>())!=2) throw new Exception("Cannot send installer test input");
+    }
+}
+'@
+function Invoke-InstallerControl($Control) {
+    $rect = $Control.Current.BoundingRectangle
+    if ($rect.Width -le 0 -or $rect.Height -le 0) { throw 'Installer control has no visible hit target' }
+    [InstallerInput]::Click([int]($rect.X + $rect.Width/2),[int]($rect.Y + $rect.Height/2))
+}
 $wizard = Start-Process $setup.FullName -ArgumentList @('/SP-','/SUPPRESSMSGBOXES','/NORESTART','/TASKS=','/LANG=chinesesimp',"/DIR=`"$destination`"") -PassThru
 try {
     $deadline = (Get-Date).AddSeconds(90)
@@ -19,9 +40,12 @@ try {
         $windows = [Windows.Automation.AutomationElement]::RootElement.FindAll([Windows.Automation.TreeScope]::Children, [Windows.Automation.Condition]::TrueCondition)
         foreach ($window in $windows) {
             if (!$owners.Contains($window.Current.ProcessId) -or $window.Current.ClassName -ne 'TWizardForm') { continue }
+            [InstallerInput]::SetForegroundWindow([IntPtr]$window.Current.NativeWindowHandle) | Out-Null
             $elements = $window.FindAll([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.Condition]::TrueCondition)
-            $buttons = @($elements | Where-Object { $_.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and $_.Current.IsEnabled -and !$_.Current.IsOffscreen })
-            $finish = $buttons | Where-Object { $_.Current.Name.Replace('&','') -match '^完成|^Finish$' } | Select-Object -First 1
+            # Inno's owner-drawn controls are exposed as UIA Pane, not Button /
+            # RadioButton. Locate their accessible names and use real input.
+            $buttons = @($elements | Where-Object { $_.Current.IsEnabled -and !$_.Current.IsOffscreen })
+            $finish = $buttons | Where-Object { $_.Current.Name.Replace('&','') -match '^完成(?:\([A-Z]\))?$|^Finish$' } | Select-Object -First 1
             if ($finish) {
                 $net = $buttons | Where-Object { $_.Current.Name -eq '下载 .NET 10' } | Select-Object -First 1
                 $sdk = $buttons | Where-Object { $_.Current.Name -eq '下载 Windows 运行库' } | Select-Object -First 1
@@ -37,13 +61,13 @@ try {
                 $graphics.Dispose(); $bitmap.Dispose()
                 # Leave the default post-install choice intact; close a newly
                 # launched first-run UI below using only this test installation.
-                $finish.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
+                Invoke-InstallerControl $finish
                 $verified = $true; break
             }
-            $accept = $elements | Where-Object { $_.Current.ControlType -eq [Windows.Automation.ControlType]::RadioButton -and $_.Current.Name.Replace('&','') -match '^我(?:接受|同意)|^I accept' } | Select-Object -First 1
-            if ($accept) { $accept.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select() }
-            $next = $buttons | Where-Object { $_.Current.Name.Replace('&','') -match '^下一步|^安装|^Next|^Install$' } | Select-Object -First 1
-            if ($next) { $next.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke() }
+            $accept = $buttons | Where-Object { $_.Current.Name.Replace('&','') -match '^我(?:接受|同意)|^I accept' } | Select-Object -First 1
+            if ($accept) { Invoke-InstallerControl $accept }
+            $next = $buttons | Where-Object { $_.Current.Name.Replace('&','') -match '^(?:下一步|安装)(?:\([A-Z]\))?\s*>?$|^Next\b|^Install$' } | Select-Object -First 1
+            if ($next) { Invoke-InstallerControl $next }
         }
     } while (!$verified -and (Get-Date) -lt $deadline)
     if (!$verified -or !$wizard.WaitForExit(10000) -or $wizard.ExitCode -ne 0) { throw 'Interactive installer verification did not complete' }
