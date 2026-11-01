@@ -1,3 +1,16 @@
+# 0.3.2 Windows 与 Linux 正式发布验证
+
+[正式版本 v0.3.2](https://github.com/Infinifar/rustclipsync-desktop/releases/tag/v0.3.2)
+已由[统一 CI 41269738505](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41269738505)
+发布，标签指向 `9641db10b7beea16d61e9e2912591b5e945170c6`。
+Windows 原生构建、界面与安装测试、Rust 测试/Clippy、Wayland 及四个 Linux 发行版的打包和启动检查全部通过。
+
+已下载五个安装包及统一 SHA256SUMS，逐项核对清单、GitHub 发布文件大小和服务器 SHA-256 摘要，一致。
+Windows 安装器为 10,173,613 字节，SHA-256 为 `a2e0d6d68d61063302630b6d6254aca5b41495b7176bf311734fc5189f797912`，仍未签名。
+发布同时完成 4 次失败/超时构建及其 18 个产物的清理，保留成功构建。下面记录三项优化的详细测量方法。
+
+---
+
 # Windows 运行时优化验证（main）
 
 验证源码：[`e2fcc3c`](https://github.com/Infinifar/rustclipsync-desktop/commit/e2fcc3cea73b333df698d5e32caf74080d2c1326)。
