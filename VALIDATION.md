@@ -1,3 +1,14 @@
+# 共享核心修复快照同步（2026-11-01）
+
+当前工作区通过 `bash scripts/sync-core.sh` 更新 `agent/vendor/rustclipsync-core`，包含共享核心的 6 项同步边界修复。`UPSTREAM.json` 已重新生成，`sync-core.sh --check` 与 `python3 scripts/verify-core.py` 均通过，快照与共享源码逐文件一致。
+
+- `cargo fmt --all -- --check` 通过。
+- `cargo test --locked`：24 项通过、5 项按原设置忽略。
+- `cargo clippy --locked --all-targets -- -D warnings` 通过。
+- `cargo clippy --locked --all-targets --features check-windows -- -D warnings` 通过；这是 Linux 上的 Windows 适配类型检查，不代替 Windows 原生运行测试。
+
+共享核心仍为 0.2.0，公开 API、协议和持久化格式兼容，客户端调用代码无需调整。依赖清单与解析版本未变，现有 `Cargo.lock` 可直接用于上述 `--locked` 检查，无需更新。本次只更新源码快照及验证记录，未构建发布安装包或执行桌面部署。
+
 # 0.3.2 Windows 与 Linux 正式发布验证
 
 [正式版本 v0.3.2](https://github.com/Infinifar/rustclipsync-desktop/releases/tag/v0.3.2)
