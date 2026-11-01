@@ -8,7 +8,7 @@
     <ApplicationIcon>..\..\assets\rustclipsync.ico</ApplicationIcon>
     <AssemblyName>RustClipSync</AssemblyName>
     <RootNamespace>RustClipSync</RootNamespace>
-    <Version>0.3.1</Version>
+    <Version>0.3.2</Version>
     <UseWinUI>true</UseWinUI>
     <EnableMsixTooling>true</EnableMsixTooling>
     <GenerateAppxPackageOnBuild>false</GenerateAppxPackageOnBuild>

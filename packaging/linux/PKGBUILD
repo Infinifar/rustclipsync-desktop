@@ -1,7 +1,7 @@
 # Build from this repository checkout: cd packaging/linux && makepkg -si
 # This is a local source recipe; a future AUR submission must pin its source archive.
 pkgname=rustclipsync-desktop
-pkgver=0.3.1
+pkgver=0.3.2
 pkgrel=1
 pkgdesc='RustClipSync clipboard client with a Qt 6/QML interface and Rust background agent'
 arch=('x86_64')
