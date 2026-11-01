@@ -14,7 +14,7 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parent.parent
 VERSION_FILES = (
     "agent/Cargo.toml", "Cargo.lock", "ui/RustClipSync/RustClipSync.csproj",
-    "ui/RustClipSync/MainWindow.xaml", "agent/app.rc", "packaging/RustClipSync.iss",
+    "ui/RustClipSync/MainView.xaml", "agent/app.rc", "packaging/RustClipSync.iss",
     "ui/linux/CMakeLists.txt", "ui/linux/main.cpp", "packaging/linux/PKGBUILD",
 )
 
@@ -34,7 +34,7 @@ def check_versions(root=ROOT):
     values = {
         "Cargo.lock": next(p["version"] for p in locked if p["name"] == "rustclipsync-agent"),
         "WinUI assembly": ET.parse(root / "ui/RustClipSync/RustClipSync.csproj").findtext("PropertyGroup/Version"),
-        "WinUI about": match_version(root, "ui/RustClipSync/MainWindow.xaml", r'Text="RustClipSync ([0-9.]+)"'),
+        "WinUI about": match_version(root, "ui/RustClipSync/MainView.xaml", r'Text="RustClipSync ([0-9.]+)"'),
         "installer": match_version(root, "packaging/RustClipSync.iss", r'#define AppVersion "([0-9.]+)"'),
         "Qt project": match_version(root, "ui/linux/CMakeLists.txt", r'project\(RustClipSyncLinux VERSION ([0-9.]+)'),
         "Qt application": match_version(root, "ui/linux/main.cpp", r'setApplicationVersion\("([0-9.]+)"\)'),
