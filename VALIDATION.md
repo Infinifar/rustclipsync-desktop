@@ -1,4 +1,25 @@
-# Linux 桌面适配与 Windows 回归验证
+# 0.3.0 统一正式发布验证
+
+日期：2026-10-31（America/New_York）。受测和发布提交：
+`6c42da5c9bfa70e0cfcffa1699cfe414b8b173e8`。
+
+[统一 CI / Release 41256795151](https://github.com/Infinifar/rustclipsync-desktop/actions/runs/41256795151)
+通过版本与发布规则检查、Windows 原生构建/界面/安装/卸载验证、便携后台检查、
+四种 Linux 发行版的构建/测试/安装验证，以及独立原生 Wayland 测试。
+共享核心版本保持 0.2.0，客户端版本元数据统一为 0.3.0。
+
+[正式版本 v0.3.0](https://github.com/Infinifar/rustclipsync-desktop/releases/tag/v0.3.0)
+已设为 Latest，包含一个 Windows EXE、两个 DEB、一个 RPM、一个 Arch 包及统一
+SHA256SUMS。公开发布的五个安装包摘要与 SHA256SUMS 逐项一致；版本标签固定到
+上述受测提交。Windows 安装包仍未签名。
+
+发布和失败构建清理由同一次工作流完成，共删除 27 次失败/超时运行及其 40 个产物，
+保留成功、取消和仍在执行的运行。发布规则的 9 项单元测试覆盖文件缺失、重复与
+校验失败时阻止发布，以及清理范围和未发布草稿的恢复识别。
+
+---
+
+# Linux 桌面适配与 Windows 回归验证（发布前）
 
 日期：2026-10-31。受测代码提交：`efc586b6352c006b95449464e1ac77678dea8cee`。
 本轮复用既有共享核心，快照 SHA-256 校验通过；未修改服务端、Android 或 Omaclipsync。
@@ -57,7 +78,7 @@ GNOME Keyring 的 IPC_LOCK 能力只配置在一次性构建容器中。
   系统 Qt 和 glibc 的最低要求以各包的实际构建基线及依赖元数据为准。
 - 本轮未进行不同真实桌面版本的完整矩阵、跨设备长期同步、休眠恢复或新的
   性能/内存基准，不将安装包大小作为常驻内存指标。
-- Linux 当前构建产物通过 Actions 提供；既有正式 Windows Release 未被替换。
+- 该轮验证仅产出 Actions 安装包；后续 0.3.0 已完成双端正式发布，见上方记录。
 
 ---
 
