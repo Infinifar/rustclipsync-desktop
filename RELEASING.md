@@ -7,7 +7,7 @@ Windows 和 Linux 工作流仅作为可复用子工作流，不再分别响应�
 
 1. 更新客户端版本：Rust agent、Cargo.lock、WinUI 工程/关于、Win32 资源、
    Inno Setup、Qt 工程/应用版本和 Arch PKGBUILD。共享核心使用独立 API 版本。
-2. 新建 `releases/v版本号.md`，填写本次发布说明。
+2. 新建 `releases/v版本号.md`，使用英文填写本次发布说明。
 3. 本地执行 `python3 scripts/release.py check` 和
    `python3 -m unittest discover -s scripts -p 'test_release.py' -v`。
 4. 提交到 `main`。对应版本标签尚不存在时，工作流自动安排正式发布；已有标签
@@ -44,3 +44,8 @@ Windows 精简包使用共享运行库；`packaging/windows-runtimes.json` 中�
 正式发布与代码签名分别管理。当前 Windows 安装包未签名，发布说明明确标注；
 SignPath 获批并接入后，须先签名和验证，再生成最终校验和。见
 [签名政策](CODE-SIGNING.md)。
+
+## 更新已发布版本的说明
+
+编辑对应的 `releases/v版本号.md` 并推送到 `main`，`Release notes` 工作流会同步英文说明到已有的正式 Release。
+该流程只编辑说明正文，不移动标签或替换安装包；版本尚未发布时跳过，由正式发布流程读取该文件。

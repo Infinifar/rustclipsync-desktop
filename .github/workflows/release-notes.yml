@@ -1,0 +1,61 @@
+name: Release notes
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'releases/*.md'
+      - '.github/workflows/release-notes.yml'
+permissions:
+  contents: read
+concurrency:
+  group: release-notes-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Sync changed notes to existing published releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, subprocess
+          from pathlib import Path
+          paths = subprocess.check_output(['git', 'diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD', '--', 'releases/'], text=True).splitlines()
+          def fetch(tag):
+              return subprocess.run(['gh', 'api', f'repos/{os.environ["GH_REPO"]}/releases/tags/{tag}'], capture_output=True, text=True)
+          def assets(release):
+              return sorted((a['id'], a['name'], a['size'], a.get('digest')) for a in release['assets'])
+          for path in paths:
+              match = re.fullmatch(r'releases/(v[0-9]+\.[0-9]+\.[0-9]+)\.md', path)
+              if not match or not Path(path).is_file():
+                  continue
+              tag = match[1]
+              result = fetch(tag)
+              if result.returncode:
+                  if 'HTTP 404' in result.stderr:
+                      print(f'{tag}: not published yet; the release build will use this file')
+                      continue
+                  raise RuntimeError(f'Cannot read release {tag}: {result.stderr}')
+              before = json.loads(result.stdout)
+              if before['draft'] or before['prerelease']:
+                  print(f'{tag}: skipping draft/prerelease')
+                  continue
+              subprocess.run(['gh', 'release', 'edit', tag, '--notes-file', path], check=True)
+              result = fetch(tag)
+              result.check_returncode()
+              after = json.loads(result.stdout)
+              assert after['body'].strip() == Path(path).read_text().strip(), 'Release notes mismatch'
+              assert assets(before) == assets(after), 'Release assets changed'
+              for field in ('id', 'tag_name', 'target_commitish', 'draft', 'prerelease'):
+                  assert before[field] == after[field], f'Release metadata changed: {field}'
+              print(f'{tag}: notes updated; tag and assets preserved')
+          PY
