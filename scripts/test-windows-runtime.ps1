@@ -15,13 +15,16 @@ function History-Rpc([string]$Method,[hashtable]$Parameters) {
     # was sent; never replay a mutation after an ambiguous response failure.
     $errorsPath = Join-Path $env:RUNNER_TEMP 'runtime-history-rpc-error.txt'
     for ($attempt=0;$attempt -lt 15;$attempt++) {
-        $raw = $request | & "$destination/rustclipsync-agent.exe" rpc 2>$errorsPath
-        if ($LASTEXITCODE -eq 0) { break }
+        # This is a Windows-subsystem EXE. Keep a downstream pipeline consumer
+        # so PowerShell waits for its redirected stdout and exit code.
+        $raw = $request | & "$destination/rustclipsync-agent.exe" rpc 2>$errorsPath | Out-String
+        $rpcExit = $LASTEXITCODE
+        if ($rpcExit -eq 0) { break }
         if ((Get-Content $errorsPath -Raw) -notmatch 'os error 231') { throw "History test transport failed: $Method" }
         Start-Sleep -Milliseconds 100
     }
     $response = $raw | ConvertFrom-Json
-    if ($LASTEXITCODE -ne 0 -or !$response.ok) { throw "History test operation failed: $Method" }
+    if ($rpcExit -ne 0 -or !$response.ok) { throw "History test operation failed: $Method (exit=$rpcExit error=$($response.error) responseChars=$($raw.Length))" }
     return $response.result
 }
 function Count-RuntimeEvents([string]$Kind,[string]$Scope,[string]$Detail) {
