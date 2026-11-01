@@ -50,7 +50,17 @@ function Assert-CenteredNavigation {
     if ([Math]::Abs(($left+$right)/2 - ($bounds.Left+$bounds.Right)/2) -gt 8) { throw 'Top navigation group is not centered' }
 }
 $script:window = [System.Windows.Automation.AutomationElement]::FromHandle($ui.MainWindowHandle)
+function Get-RuntimeEvents {
+    if (!(Test-Path $metricsPath)) { return @() }
+    @(Get-Content $metricsPath | ForEach-Object { try { $entry = $_ | ConvertFrom-Json; if ($entry.process -eq $ui.Id) { $entry } } catch { } })
+}
+$created = @(Get-RuntimeEvents | Where-Object kind -eq 'pages')
+if (!$created.Count -or $created[0].detail -ne 'home') { throw 'Cold startup created deferred settings or history controls' }
+$ui.Refresh()
+$script:runtimeUiReport = [ordered]@{ startupPages = $created[0].detail; startupWorkingSetBytes = $ui.WorkingSet64; startupPrivateBytes = $ui.PrivateMemorySize64 }
 Invoke-Control NavAppearance
+$created = @(Get-RuntimeEvents | Where-Object kind -eq 'pages')
+if ($created[-1].detail -ne 'home,appearance') { throw 'Opening Appearance created unrelated settings or history controls' }
 Select-Combo ThemeChoice '深色'
 Select-Combo FontChoice '大'
 $appearance = Get-Content "$env:LOCALAPPDATA/RustClipSync/appearance.json" -Raw | ConvertFrom-Json

@@ -24,6 +24,14 @@ $cipher = [byte[]]::new($clear.Length); $tag = [byte[]]::new(16)
 $crypto = [Security.Cryptography.AesGcm]::new($key,16)
 $crypto.Encrypt($nonce,$clear,$cipher,$tag,[Text.Encoding]::ASCII.GetBytes('RCS1')); $crypto.Dispose()
 [IO.File]::WriteAllBytes("$data/$identity.state",([Text.Encoding]::ASCII.GetBytes('RCS1') + $nonce + $cipher + $tag + [byte[]]@(10)))
+$historyEntries = @(0..24 | ForEach-Object { @{id=[Guid]::NewGuid().ToString();text=('runtime history fixture {0:D4} 中文' -f $_);direction='download';timestamp=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()-$_;favorite=$false} })
+$historyClear = [Text.Encoding]::UTF8.GetBytes((@{entries=$historyEntries} | ConvertTo-Json -Depth 6 -Compress))
+$historyKey = [Security.Cryptography.SHA256]::HashData($key + [Text.Encoding]::UTF8.GetBytes('RustClipSync history'))
+$nonce = [Security.Cryptography.RandomNumberGenerator]::GetBytes(12)
+$cipher = [byte[]]::new($historyClear.Length); $tag = [byte[]]::new(16)
+$crypto = [Security.Cryptography.AesGcm]::new($historyKey,16)
+$crypto.Encrypt($nonce,$historyClear,$cipher,$tag,[Text.Encoding]::ASCII.GetBytes('RCH1')); $crypto.Dispose()
+[IO.File]::WriteAllBytes("$data/$identity.history",([Text.Encoding]::ASCII.GetBytes('RCH1') + $nonce + $cipher + $tag))
 @{server=$server;user='fixture';direction='both';paused=$true} | ConvertTo-Json | Set-Content "$data/config.json" -Encoding utf8
 $env:NO_PROXY = '127.0.0.1,localhost'
 $ui = Start-Process "$destination/RustClipSync.exe" -PassThru
@@ -86,6 +94,7 @@ do { $stored = Get-Content "$data/config.json" -Raw | ConvertFrom-Json; if ($sto
 if (!$stored.history.enabled -or $stored.history.days -ne 7) { throw 'WinUI settings were not saved by the backend' }
 . "$PSScriptRoot/test-windows-sensitive-ui.ps1"
 . "$PSScriptRoot/test-windows-shortcuts-ui.ps1"
+. "$PSScriptRoot/test-windows-runtime.ps1"
 # Closing the UI must leave exactly one background process; stop it explicitly.
 $ui.CloseMainWindow() | Out-Null
 if (!$ui.WaitForExit(10000) -or $ui.ExitCode -ne 0) { throw 'Paired UI did not exit cleanly' }

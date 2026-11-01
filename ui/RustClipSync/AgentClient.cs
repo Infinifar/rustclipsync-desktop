@@ -9,6 +9,7 @@ using Microsoft.Win32.SafeHandles;
 namespace RustClipSync;
 internal sealed class AgentClient
 {
+    internal string Scope { get; set; } = "ui";
     internal static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
     private readonly SemaphoreSlim gate = new(1, 1);
     private readonly CancellationTokenSource lifetime = new();
@@ -42,6 +43,7 @@ internal sealed class AgentClient
             if (request.Length > 256 * 1024) throw new IOException("request_limit");
             await pipe.WriteAsync(BitConverter.GetBytes(request.Length), timeout.Token);
             await pipe.WriteAsync(request, timeout.Token);
+            RuntimeDiagnostics.Record("rpc", Scope, method);
             var header = new byte[4]; await pipe.ReadExactlyAsync(header, timeout.Token);
             var size = BitConverter.ToInt32(header);
             if (size <= 0 || size > 256 * 1024) throw new IOException("response_limit");

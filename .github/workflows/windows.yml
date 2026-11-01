@@ -35,6 +35,8 @@ jobs:
       - run: cargo clippy --locked --all-targets -- -D warnings
       - name: Test portable logic and Windows storage/DPAPI
         run: cargo test --locked -- --test-threads=1
+      - name: Measure allocations for synthetic 16 MiB history reads
+        run: cargo test --locked --test history_cache -- --ignored --nocapture --test-threads=1
       - name: Test the clipboard on the disposable hosted Windows runner
         env:
           RCS_WINDOWS_DISPOSABLE: "1"

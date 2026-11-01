@@ -8,7 +8,7 @@ namespace RustClipSync;
 
 public sealed partial class SensitiveInboxWindow : Window
 {
-    private readonly AgentClient agent = new();
+    private readonly AgentClient agent = new() { Scope = "inbox" };
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(2) };
     private string? inboxId;
     private bool busy, closed, revealed;

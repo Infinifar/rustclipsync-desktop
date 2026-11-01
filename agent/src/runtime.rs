@@ -43,6 +43,7 @@ struct Snapshot {
     last_sync: u64,
     history_error: bool,
     history_revision: u64,
+    history_epoch: String,
     inbox: Option<Value>,
 }
 pub struct Control {
@@ -76,6 +77,7 @@ impl Control {
                 last_sync: 0,
                 history_error: false,
                 history_revision: 0,
+                history_epoch: String::new(),
                 inbox: None,
             }),
             commands: Mutex::new(VecDeque::new()),
@@ -97,7 +99,7 @@ impl Control {
     fn status_value(&self) -> Result<Value, &'static str> {
         let s = self.snapshot.lock().map_err(|_| "unavailable")?;
         Ok(
-            json!({"state":*self.status.lock().map_err(|_|"unavailable")?,"paused":self.paused.load(Ordering::SeqCst),"config":s.config,"configRevision":s.revision,"deviceId":s.device,"cursor":s.cursor,"pending":s.pending,"lastSync":s.last_sync,"historyError":s.history_error,"historyRevision":s.history_revision,"inbox":s.inbox,"shortcutError":self.shortcut_error.load(Ordering::SeqCst),"version":env!("CARGO_PKG_VERSION")}),
+            json!({"state":*self.status.lock().map_err(|_|"unavailable")?,"paused":self.paused.load(Ordering::SeqCst),"config":s.config,"configRevision":s.revision,"deviceId":s.device,"cursor":s.cursor,"pending":s.pending,"lastSync":s.last_sync,"historyError":s.history_error,"historyRevision":s.history_revision,"historyEpoch":s.history_epoch,"inbox":s.inbox,"shortcutError":self.shortcut_error.load(Ordering::SeqCst),"version":env!("CARGO_PKG_VERSION")}),
         )
     }
     pub fn execute(&self, command: Command) -> Result<Value, &'static str> {
@@ -157,6 +159,7 @@ impl Control {
             s.pending = session.has_pending();
             s.history_error = session.history_error || session.history.failed();
             s.history_revision = session.history.revision();
+            s.history_epoch = session.history.epoch();
             s.inbox = session
                 .persisted
                 .inbox
@@ -389,10 +392,7 @@ fn run_inner(
         }
         if Instant::now() >= cleanup {
             let now = unix_time();
-            let _ = session.history.change(|data, cfg| {
-                data.prune(cfg, now);
-                Ok(())
-            });
+            let _ = session.history.prune(now);
             if session
                 .persisted
                 .inbox
@@ -567,41 +567,27 @@ fn command(
             offset,
             query,
             favorites,
-        } => {
-            s.history
-                .change(|data, cfg| {
-                    data.prune(cfg, unix_time());
-                    Ok(())
-                })
-                .map_err(|_| SyncError::Remote(Error::Status(422)))?;
-            let data = s
-                .history
-                .data()
-                .map_err(|_| SyncError::Remote(Error::Status(422)))?;
-            let query = query.to_lowercase();
-            let entries: Vec<_> = data
-                .entries
-                .iter()
-                .filter(|e| {
-                    (!favorites || e.favorite)
-                        && (query.is_empty() || e.text.to_lowercase().contains(&query))
-                })
-                .collect();
-            let items:Vec<_>=entries.iter().skip(offset).take(20).map(|e|json!({"id":e.id,"preview":e.text.chars().take(240).collect::<String>(),"timestamp":e.timestamp,"direction":e.direction,"favorite":e.favorite})).collect();
-            Ok(json!({"total":entries.len(),"items":items}))
-        }
+            if_epoch,
+            if_revision,
+        } => s
+            .history
+            .page(
+                offset,
+                &query,
+                favorites,
+                if_epoch.as_deref(),
+                if_revision,
+                unix_time(),
+            )
+            .map_err(|_| SyncError::Remote(Error::Status(422))),
         Command::CopyHistory { id } => {
-            let data = s
+            let text = s
                 .history
-                .data()
-                .map_err(|_| SyncError::Remote(Error::Status(422)))?;
-            let item = data
-                .entries
-                .iter()
-                .find(|e| e.id == id)
+                .text(&id)
+                .map_err(|_| SyncError::Remote(Error::Status(422)))?
                 .ok_or_else(invalid)?;
             s.clipboard
-                .copy_saved(&item.text, &rustclipsync_core::state::random_uuid()?, false)
+                .copy_saved(&text, &rustclipsync_core::state::random_uuid()?, false)
                 .map_err(SyncError::Clipboard)?;
             Ok(json!({}))
         }

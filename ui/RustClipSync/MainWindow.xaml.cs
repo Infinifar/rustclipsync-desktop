@@ -7,11 +7,17 @@ using Microsoft.UI.Xaml.Controls;
 namespace RustClipSync;
 public sealed partial class MainWindow : Window
 {
-    private readonly AgentClient agent = new();
+    private readonly AgentClient agent = new() { Scope = "main" };
+    private readonly WindowActivity activity;
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(2) };
     private AgentSettings? config;
     private ulong revision, formRevision;
     private bool initialized, updating, busy, closed, running, paused, formLoaded;
+    private bool refreshing, refreshAgain;
+    public bool AppearanceCreated { get; private set; }
+    public bool SettingsCreated { get; private set; }
+    public bool ShortcutsCreated { get; private set; }
+    public bool HistoryCreated { get; private set; }
     private string state = "stopped";
     private string? inboxId;
     private bool inboxRevealed;
@@ -21,6 +27,8 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        RuntimeDiagnostics.Pages(AppearancePage is not null, SettingsPage is not null, ShortcutsPage is not null, HistoryContents is not null);
+        activity = new WindowActivity(this, UpdatePolling);
         var area = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(AppWindow.Id, Microsoft.UI.Windowing.DisplayAreaFallback.Primary).WorkArea;
         var scale = Math.Max(1, GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(this)) / 96.0);
         var width = Math.Min((int)(860 * scale), area.Width); var height = Math.Min((int)(820 * scale), area.Height);
@@ -28,12 +36,10 @@ public sealed partial class MainWindow : Window
         SetMinimumWindowSize(scale);
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "rustclipsync.ico"));
         try { appearance = AppearanceSettings.Load(); } catch { Show("外观设置无法读取", "暂时采用系统主题。可以在外观页重新保存。", InfoBarSeverity.Warning); }
-        ThemeChoice.SelectedIndex = appearance.Theme == "dark" ? 2 : appearance.Theme == "light" ? 1 : 0;
-        FontChoice.SelectedIndex = appearance.FontSize == 18 ? 2 : appearance.FontSize == 16 ? 1 : 0;
         Root.ActualThemeChanged += (_, _) => ApplyCaptionTheme();
         ApplyAppearance();
-        ReadConfig(); LoadForm(); ReadStartup(); Navigation.SelectedItem = HomeNav;
-        Root.Loaded += async (_, _) =>
+        ReadConfig(); Navigation.SelectedItem = HomeNav;
+        Root.Loaded += (_, _) =>
         {
             if (initialized) return;
             initialized = true;
@@ -47,11 +53,46 @@ public sealed partial class MainWindow : Window
                 }
             };
             if (config is not null) { try { AgentClient.Start(); } catch { Show("无法启动后台", "请确认完整安装了 RustClipSync。", InfoBarSeverity.Error); } }
-            await Refresh(); timer.Start();
+            activity.Update(true);
         };
-        timer.Tick += async (_, _) => { if (!busy && !agent.IsBusy && !closed) await Refresh(); };
-        Closed += (_, _) => { closed = true; HideInbox(); timer.Stop(); agent.Close(); };
+        timer.Tick += async (_, _) => { if (!activity.IsActive) { activity.Update(true); return; } if (!busy && !agent.IsBusy && !closed) await Refresh(); };
+        Closed += (_, _) => { closed = true; HideInbox(); timer.Stop(); activity.Dispose(); HistoryContents?.Close(); agent.Close(); };
         Activated += (_, args) => { if (args.WindowActivationState == WindowActivationState.Deactivated) HideInbox(); };
+    }
+    private bool CanRefresh => initialized && !closed && activity.IsActive;
+    private void UpdatePolling(bool active)
+    {
+        if (!initialized || closed) return;
+        UpdateHistoryActivity();
+        if (!active) { timer.Stop(); HideInbox(); RuntimeDiagnostics.Record("polling", "main", "stopped"); return; }
+        if (timer.IsEnabled) return;
+        timer.Start(); RuntimeDiagnostics.Record("polling", "main", "started");
+        _ = Refresh();
+    }
+    private void UpdateHistoryActivity() => HistoryContents?.SetActive(CanRefresh && ReferenceEquals(Navigation.SelectedItem, HomeNav) && HistoryPanel.IsExpanded);
+    private void EnsurePage(string page)
+    {
+        var property = page switch {
+            "appearance" when !AppearanceCreated => nameof(AppearanceCreated),
+            "settings" when !SettingsCreated => nameof(SettingsCreated),
+            "shortcuts" when !ShortcutsCreated => nameof(ShortcutsCreated),
+            "history" when !HistoryCreated => nameof(HistoryCreated),
+            _ => null
+        };
+        if (property is null) return;
+        var previous = updating; updating = true;
+        try
+        {
+            switch (page) { case "appearance": AppearanceCreated = true; break; case "settings": SettingsCreated = true; break; case "shortcuts": ShortcutsCreated = true; break; case "history": HistoryCreated = true; break; }
+            Bindings.Update();
+            if (page == "appearance")
+            {
+                ThemeChoice.SelectedIndex = appearance.Theme == "dark" ? 2 : appearance.Theme == "light" ? 1 : 0;
+                FontChoice.SelectedIndex = appearance.FontSize == 18 ? 2 : appearance.FontSize == 16 ? 1 : 0;
+            }
+            RuntimeDiagnostics.Pages(AppearancePage is not null, SettingsPage is not null, ShortcutsPage is not null, HistoryContents is not null);
+        }
+        finally { updating = previous; }
     }
     private void SetMinimumWindowSize(double scale)
     {
@@ -86,12 +127,13 @@ public sealed partial class MainWindow : Window
     }
     private void SetBusy(bool value)
     {
-        busy = value; ConnectButton.IsEnabled = !value; SaveSettingsButton.IsEnabled = !value && running;
+        busy = value;
+        if (SettingsPage is not null) { ConnectButton.IsEnabled = !value; SaveSettingsButton.IsEnabled = !value && running; }
         PushButton.IsEnabled = PullButton.IsEnabled = !value && running;
         PauseButton.IsEnabled = !value; StopButton.IsEnabled = !value && running;
         DirectionBox.IsEnabled = !value && running;
         HistoryPanel.IsEnabled = !value && running;
-        SaveShortcutsButton.IsEnabled = !value && running && config is not null;
+        if (ShortcutsPage is not null) SaveShortcutsButton.IsEnabled = !value && running && config is not null;
         InboxControls();
     }
     private async Task<bool> Confirm(string title, string message, string action)
@@ -126,16 +168,18 @@ public sealed partial class MainWindow : Window
     }
     private void Navigation_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
-        if (HomePage is null || AppearancePage is null || SettingsPage is null || ShortcutsPage is null) return;
-        var page = (args.SelectedItem as NavigationViewItem)?.Tag as string;
+        if (HomePage is null) return;
+        var page = (args.SelectedItem as NavigationViewItem)?.Tag as string ?? "home";
+        EnsurePage(page);
         if (page != "home") HideInbox();
         HomePage.Visibility = page == "home" ? Visibility.Visible : Visibility.Collapsed;
-        AppearancePage.Visibility = page == "appearance" ? Visibility.Visible : Visibility.Collapsed;
-        SettingsPage.Visibility = page == "settings" ? Visibility.Visible : Visibility.Collapsed;
-        ShortcutsPage.Visibility = page == "shortcuts" ? Visibility.Visible : Visibility.Collapsed;
+        if (AppearancePage is not null) AppearancePage.Visibility = page == "appearance" ? Visibility.Visible : Visibility.Collapsed;
+        if (SettingsPage is not null) SettingsPage.Visibility = page == "settings" ? Visibility.Visible : Visibility.Collapsed;
+        if (ShortcutsPage is not null) ShortcutsPage.Visibility = page == "shortcuts" ? Visibility.Visible : Visibility.Collapsed;
         if (page == "shortcuts" && initialized) LoadShortcuts();
         if (page == "settings" && initialized) { LoadForm(); ReadStartup(); }
-        if (page != "settings") PasswordBox.Password = "";
+        if (page != "settings" && PasswordBox is not null) PasswordBox.Password = "";
+        UpdateHistoryActivity(); SetBusy(busy);
         if (initialized) DispatcherQueue.TryEnqueue(() => {
             if (closed) return;
             PageScroll.ChangeView(null, 0, null, true);
@@ -155,6 +199,7 @@ public sealed partial class MainWindow : Window
     }
     private void LoadForm()
     {
+        if (SettingsPage is null) return;
         updating = true;
         try
         {
@@ -172,7 +217,18 @@ public sealed partial class MainWindow : Window
     }
     private async Task Refresh()
     {
-        if (closed) return;
+        if (!CanRefresh) return;
+        if (refreshing) { refreshAgain = true; return; }
+        refreshing = true;
+        try { await RefreshCore(); }
+        finally
+        {
+            refreshing = false;
+            if (refreshAgain) { refreshAgain = false; if (CanRefresh) _ = Refresh(); }
+        }
+    }
+    private async Task RefreshCore()
+    {
         using var process = AgentClient.Find(); running = process is not null;
         if (!running)
         {
@@ -184,7 +240,7 @@ public sealed partial class MainWindow : Window
         }
         try
         {
-            var snapshot = await agent.Call("getStatus"); if (closed) return;
+            var snapshot = await agent.Call("getStatus"); if (!CanRefresh) return;
             state = snapshot.GetProperty("state").GetString() ?? "connecting";
             paused = snapshot.GetProperty("paused").GetBoolean();
             config = snapshot.GetProperty("config").Deserialize<AgentSettings>(AgentClient.Json)!;
@@ -200,10 +256,11 @@ public sealed partial class MainWindow : Window
             PauseButton.Content = paused ? "恢复" : "暂停";
             updating = true; DirectionBox.SelectedIndex = config.Direction == "download" ? 2 : config.Direction == "upload" ? 1 : 0; updating = false;
             if (!formLoaded) LoadForm();
-            ShortcutState.Text = snapshot.TryGetProperty("shortcutError", out var hotkeyError) && hotkeyError.GetBoolean() ? "快捷键注册失败，可能已被占用。请修改或重新保存；同步仍独立运行。" : "快捷键由后台注册，关闭主窗口仍有效。";
+            if (ShortcutsPage is not null) ShortcutState.Text = snapshot.TryGetProperty("shortcutError", out var hotkeyError) && hotkeyError.GetBoolean() ? "快捷键注册失败，可能已被占用。请修改或重新保存；同步仍独立运行。" : "快捷键由后台注册，关闭主窗口仍有效。";
+            if (HistoryContents is not null) await HistoryContents.RefreshFrom(snapshot);
         }
-        catch { if (!closed) { StateText.Text = "后台正在启动或处理操作"; InboxMetadata(null, "暂时无法读取收件项"); } }
-        finally { if (!closed) SetBusy(busy); }
+        catch { if (CanRefresh) { StateText.Text = "后台正在启动或处理操作"; InboxMetadata(null, "暂时无法读取收件项"); } }
+        finally { if (CanRefresh) SetBusy(busy); }
     }
     private static string Time(long timestamp) => DateTimeOffset.FromUnixTimeSeconds(timestamp).ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
     private async Task<bool> Action(string method, object? parameters = null)
@@ -333,6 +390,7 @@ public sealed partial class MainWindow : Window
     }
     private void ReadStartup()
     {
+        if (SettingsPage is null) return;
         updating = true;
         try { StartupToggle.IsOn = StartupSettings.Enabled(); StartupState.Text = StartupToggle.IsOn ? "已创建当前用户的登录启动项。" : "当前未启用登录启动。"; }
         catch { StartupState.Text = "启动项无法读取或被其他目标占用，未修改现有文件。"; }
@@ -345,11 +403,12 @@ public sealed partial class MainWindow : Window
         catch { Show("自启设置未完成", "启动项可能被其他目标占用，或系统限制了写入权限。现有启动项未被覆盖。", InfoBarSeverity.Error); ReadStartup(); }
     }
     private async void WindowsStartup_Click(object sender, RoutedEventArgs e) { try { await Windows.System.Launcher.LaunchUriAsync(new Uri("ms-settings:startupapps")); } catch { Show("无法打开系统设置", "可从 Windows 设置 → 应用 → 启动查看。", InfoBarSeverity.Warning); } }
-    private async void History_Expanding(Expander sender, ExpanderExpandingEventArgs args) { if (initialized) await HistoryContents.Refresh(); }
+    private void History_Expanding(Expander sender, ExpanderExpandingEventArgs args) { EnsurePage("history"); HistoryContents.SetActive(CanRefresh); }
+    private void History_Collapsed(Expander sender, ExpanderCollapsedEventArgs args) => HistoryContents?.SetActive(false);
     private async void ClearHistory_Click(object sender, RoutedEventArgs e)
     {
         if (busy || !await Confirm("清空本地历史？", "将删除普通历史与收藏，不改变同步身份、游标、敏感收件项或系统剪贴板。", "清空历史")) return;
-        await Action("clearHistory"); await HistoryContents.Refresh();
+        await Action("clearHistory"); if (HistoryContents is not null) await HistoryContents.Refresh();
     }
     private ulong shortcutRevision;
     private void LoadShortcuts()

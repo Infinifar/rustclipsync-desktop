@@ -112,8 +112,9 @@ void Backend::refresh() {
     rpc("getStatus", {}, [this](const QJsonObject &result) {
         const auto previousId = m_status.value("inbox").toMap().value("id").toString();
         const auto historyRevision = m_status.value("historyRevision");
+        const auto historyEpoch = m_status.value("historyEpoch");
         m_status = result.toVariantMap();
-        if (m_historyRequested && historyRevision != m_status.value("historyRevision")) searchHistory(m_query, m_favorites, m_offset);
+        if (m_historyRequested && (historyRevision != m_status.value("historyRevision") || historyEpoch != m_status.value("historyEpoch"))) searchHistory(m_query, m_favorites, m_offset);
         if (previousId != m_status.value("inbox").toMap().value("id").toString()) hideInbox();
         emit changed();
     }, true);

@@ -1,6 +1,6 @@
 # WinUI 与 Rust 本地通信
 
-0.2.0 已实现请求/响应 Named Pipe。当前 UI 在打开时每 2 秒读取快照，关闭窗口停止查询；没有常驻 .NET 同步循环。后续事件订阅不属于本版实现。服务端 HTTP 协议不变。
+WinUI 通过请求/响应 Named Pipe 读取 Rust 后台。主窗显示时每 2 秒读取状态，最小化暂停、恢复立即刷新；关闭全部界面后停止 UI 查询，Rust 同步继续。历史列表依据实例标识与变更序号更新，不对无变化的列表重复请求或重建。服务端 HTTP 协议不变。
 
 ## 通道与边界
 
@@ -48,7 +48,7 @@
 | updateSettings | `{config: ..., expectedRevision: u64, rebindShortcuts?: bool}`，验证并原子保存；拒绝变更配对身份与过期 revision |
 | pushNow / pullNow | 用户明确触发；保持敏感/过滤/游标规则，冲突覆盖在 UI 请求确认 |
 | testFilter | `{filter: ..., text: ...}`，最多 64 KiB 测试文本，不写剪贴板或服务端 |
-| listHistory | `{offset, query, favorites}`，每页 20 条、每条最多 240 字符预览 |
+| listHistory | `{offset, query, favorites, ifEpoch?, ifRevision?}`，每页 20 条、每条最多 240 字符预览；可按缓存版本条件读取 |
 | copyHistory / deleteHistory | `{id}`，后台按 ID 查找；复制正文无需通过 UI |
 | setFavorite | `{id, favorite}`，最多 50 条并受总容量约束 |
 | clearHistory | 清理普通历史与收藏，不修改同步身份、游标或敏感收件项 |
@@ -64,6 +64,18 @@
 首次配对仍使用专用 `pair --password-stdin` 子进程。账户密码不进入通用状态通道，不落盘；重新配对必须经 UI 明确确认。主题/字号为独立的非敏感界面偏好；自启设置直接管理经过目标验证的当前用户 `.lnk`，与同步配置分开。
 
 固定错误码包括 `invalid_request`、`invalid_filter`、`busy`、`settings_changed`、`storage_error`、`history_error`、`shortcut_conflict`、`credentials`、`conflict`、`expired`、`re_pair`、`clipboard_error`、`operation_unconfirmed` 和 `needs_restart`。不透传底层 HTTP/正文错误字符串。
+
+## 历史版本与分页
+
+`getStatus` 返回 `historyEpoch` 与 `historyRevision`。实例标识在重新打开历史存储时更新，
+因此后台重启或重新配对后不能只比较数值序号。完整 `listHistory` 响应携带同样的字段、
+`unchanged: false`、`enabled`、实际 `offset`、`total` 和 `items`；版本与分页数据在同一
+存储锁内读取，界面应缓存响应中的版本，避免把旧页面标为较新的状态序号。
+
+仅在查询文字、收藏条件和偏移均相同且已有缓存时，发送 `ifEpoch` 和 `ifRevision`。
+两个值都匹配且存储可用时返回 `unchanged: true` 和版本/启用信息，不返回 `items`。
+条件缺失、实例变化、内容/配置变化或到期清理都会返回完整页面；当前页因删除超出末页时
+会自动退到有效页。查询在存储锁内筛选，仅生成当前页的预览，不复制全部正文。
 
 ## 快捷键配置
 

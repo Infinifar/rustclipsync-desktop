@@ -39,6 +39,10 @@ pub enum Command {
         query: String,
         #[serde(default)]
         favorites: bool,
+        #[serde(default, rename = "ifEpoch")]
+        if_epoch: Option<String>,
+        #[serde(default, rename = "ifRevision")]
+        if_revision: Option<u64>,
     },
     CopyHistory {
         id: String,
@@ -78,7 +82,15 @@ impl Request {
             serde_json::from_value(serde_json::json!({"method":self.method,"params":self.params}))
                 .map_err(|_| "invalid_request")?;
         match &command {
-            Command::ListHistory { offset, query, .. } if *offset > 1050 || query.len() > 1024 => {
+            Command::ListHistory {
+                offset,
+                query,
+                if_epoch,
+                ..
+            } if *offset > 1050
+                || query.len() > 1024
+                || if_epoch.as_ref().is_some_and(|v| v.len() > 64) =>
+            {
                 Err("invalid_request")
             }
             Command::CopyHistory { id }

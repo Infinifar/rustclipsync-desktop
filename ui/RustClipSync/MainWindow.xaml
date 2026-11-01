@@ -61,12 +61,12 @@
         <Button Content="连接设置" Click="OpenSettings_Click" AutomationProperties.AutomationId="ConnectionSettings"/>
         <Button x:Name="StopButton" Content="退出后台" Click="Stop_Click" IsEnabled="False" AutomationProperties.AutomationId="StopBackground"/>
        </StackPanel>
-       <Expander x:Name="HistoryPanel" Header="剪贴板历史" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Expanding="History_Expanding" AutomationProperties.AutomationId="HistoryPanel">
-        <local:HistoryView x:Name="HistoryContents"/>
+       <Expander x:Name="HistoryPanel" Header="剪贴板历史" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Expanding="History_Expanding" Collapsed="History_Collapsed" AutomationProperties.AutomationId="HistoryPanel">
+        <local:HistoryView x:Name="HistoryContents" x:Load="{x:Bind HistoryCreated}" ExternalPolling="True"/>
        </Expander>
        <TextBlock Text="已启动的同步会在关闭窗口后继续运行。双击托盘图标可再次打开，托盘菜单可暂停或退出。" Style="{StaticResource Note}"/>
       </StackPanel>
-      <StackPanel x:Name="AppearancePage" Visibility="Collapsed" Spacing="20">
+      <StackPanel x:Name="AppearancePage" x:Load="{x:Bind AppearanceCreated}" Visibility="Collapsed" Spacing="20">
        <TextBlock Text="外观" Style="{StaticResource SectionTitle}"/>
        <TextBlock Text="保留 Omaclipsync 的简洁布局，使用 Windows 原生控件与系统强调色。" Style="{StaticResource Note}"/>
        <ComboBox x:Name="ThemeChoice" Header="主题" HorizontalAlignment="Stretch" SelectionChanged="Appearance_Changed" AutomationProperties.AutomationId="ThemeChoice"><ComboBoxItem Content="跟随系统" Tag="system"/><ComboBoxItem Content="浅色" Tag="light"/><ComboBoxItem Content="深色" Tag="dark"/></ComboBox>
@@ -74,7 +74,7 @@
        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="20"><StackPanel Spacing="12"><TextBlock Text="预览" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="剪贴板已连接，可以开始同步。" TextWrapping="Wrap"/><StackPanel Orientation="Horizontal" Spacing="8"><Button Content="发送"/><Button Content="接收"/><Button Content="暂停"/></StackPanel></StackPanel></Border>
        <TextBlock Text="更改会立即生效，并在下次打开时保留。" Style="{StaticResource Note}"/>
       </StackPanel>
-      <StackPanel x:Name="ShortcutsPage" Visibility="Collapsed" Spacing="16">
+      <StackPanel x:Name="ShortcutsPage" x:Load="{x:Bind ShortcutsCreated}" Visibility="Collapsed" Spacing="16">
        <TextBlock Text="快捷键" Style="{StaticResource SectionTitle}"/>
        <TextBlock Text="后台运行时，全局快捷键可打开独立窗口，再次按下关闭对应窗口。主窗口关闭后仍可使用。" Style="{StaticResource Note}"/>
        <TextBox x:Name="HistoryShortcutBox" Header="打开 / 关闭历史记录" PlaceholderText="例如 Ctrl+Alt+H，留空不绑定" AutomationProperties.AutomationId="HistoryShortcut" MaxLength="80"/>
@@ -83,7 +83,7 @@
        <TextBlock x:Name="ShortcutState" Text="默认不绑定快捷键。完成连接并启动后台后可保存。" TextWrapping="Wrap" AutomationProperties.AutomationId="ShortcutState"/>
        <StackPanel Orientation="Horizontal" Spacing="10"><Button x:Name="SaveShortcutsButton" Content="保存快捷键" Click="SaveShortcuts_Click" AutomationProperties.AutomationId="SaveShortcuts"/><Button Content="重新载入" Click="ReloadShortcuts_Click" AutomationProperties.AutomationId="ReloadShortcuts"/></StackPanel>
       </StackPanel>
-      <StackPanel x:Name="SettingsPage" Visibility="Collapsed" Spacing="20">
+      <StackPanel x:Name="SettingsPage" x:Load="{x:Bind SettingsCreated}" Visibility="Collapsed" Spacing="20">
        <TextBlock Text="设置" Style="{StaticResource SectionTitle}"/>
        <Expander Header="开机自启与后台" IsExpanded="True" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" AutomationProperties.AutomationId="StartupSection">
         <StackPanel Spacing="12"><ToggleSwitch x:Name="StartupToggle" Header="登录 Windows 后自动启动同步" OnContent="开启" OffContent="关闭" Toggled="Startup_Toggled" AutomationProperties.AutomationId="StartAtLogin"/>

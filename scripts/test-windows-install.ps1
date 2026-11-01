@@ -37,6 +37,10 @@ foreach ($name in @('RustClipSync.exe','rustclipsync-agent.exe')) {
 $expected.Dispose(); $reference.Dispose()
 # Use a private app-data root so the setup window is guaranteed to be first-run.
 $originalData = $env:LOCALAPPDATA
+$originalMetrics = $env:RCS_UI_METRICS_FILE
+$metricsPath = Join-Path $env:RUNNER_TEMP 'RustClipSync-ui-runtime-events.jsonl'
+if (Test-Path $metricsPath) { Remove-Item $metricsPath }
+$env:RCS_UI_METRICS_FILE = $metricsPath
 $env:LOCALAPPDATA = Join-Path $env:RUNNER_TEMP 'RustClipSync-first-run-data'
 New-Item -ItemType Directory -Force $env:LOCALAPPDATA | Out-Null
 try {
@@ -88,6 +92,8 @@ public static class ScreenSize { [DllImport("user32.dll")] public static extern 
     . "$PSScriptRoot/test-windows-paired-ui.ps1"
 } finally {
     $env:LOCALAPPDATA = $originalData
+    $env:RCS_UI_METRICS_FILE = $originalMetrics
+    if (Test-Path $metricsPath) { Copy-Item $metricsPath "$root/dist/installer/runtime-ui-events.jsonl" -Force }
 }
 . "$PSScriptRoot/test-windows-installer-help.ps1"
 $remove = Start-Process "$destination/unins000.exe" -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru

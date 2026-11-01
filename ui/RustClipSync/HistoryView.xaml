@@ -4,10 +4,10 @@
          <TextBlock x:Name="HistoryNote" Text="历史默认关闭。可在设置中开启，本地记录会加密保存。" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
          <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
           <TextBox x:Name="HistorySearch" PlaceholderText="搜索历史内容" MaxLength="256" AutomationProperties.Name="搜索历史" AutomationProperties.AutomationId="HistorySearch"/>
-          <ComboBox x:Name="HistoryScope" Grid.Column="1" SelectedIndex="0"><ComboBoxItem Content="全部"/><ComboBoxItem Content="收藏"/></ComboBox>
-          <Button Grid.Column="2" Content="搜索" Click="SearchHistory_Click"/>
+          <ComboBox x:Name="HistoryScope" AutomationProperties.AutomationId="HistoryScope" Grid.Column="1" SelectedIndex="0"><ComboBoxItem Content="全部"/><ComboBoxItem Content="收藏"/></ComboBox>
+          <Button Grid.Column="2" Content="搜索" Click="SearchHistory_Click" AutomationProperties.AutomationId="SearchHistory"/>
          </Grid>
-         <ListView x:Name="HistoryList" SelectionMode="None" IsItemClickEnabled="False" MaxHeight="380" HorizontalContentAlignment="Stretch">
+         <ListView x:Name="HistoryList" AutomationProperties.AutomationId="HistoryList" SelectionMode="None" IsItemClickEnabled="False" MaxHeight="380" HorizontalContentAlignment="Stretch">
           <ListView.ItemTemplate><DataTemplate><StackPanel Spacing="8" Padding="0,8" HorizontalAlignment="Stretch">
            <TextBlock Text="{Binding Preview}" TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis"/>
            <TextBlock Text="{Binding Detail}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12"/>
@@ -15,7 +15,7 @@
           </StackPanel></DataTemplate></ListView.ItemTemplate>
          </ListView>
          <TextBlock x:Name="EmptyHistory" Text="暂无历史记录" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
-         <StackPanel Orientation="Horizontal" Spacing="10"><Button x:Name="PreviousHistory" Content="上一页" Click="PreviousHistory_Click"/><Button x:Name="NextHistory" Content="下一页" Click="NextHistory_Click"/><Button Content="清空历史" Click="ClearHistory_Click"/><TextBlock x:Name="HistoryCount" VerticalAlignment="Center"/></StackPanel>
+         <StackPanel Orientation="Horizontal" Spacing="10"><Button x:Name="PreviousHistory" AutomationProperties.AutomationId="PreviousHistory" Content="上一页" Click="PreviousHistory_Click"/><Button x:Name="NextHistory" AutomationProperties.AutomationId="NextHistory" Content="下一页" Click="NextHistory_Click"/><Button Content="清空历史" Click="ClearHistory_Click"/><TextBlock x:Name="HistoryCount" AutomationProperties.AutomationId="HistoryCount" VerticalAlignment="Center"/></StackPanel>
         </StackPanel>
  </StackPanel>
 </UserControl>

@@ -1,5 +1,5 @@
 <Window x:Class="RustClipSync.HistoryWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="using:RustClipSync" Title="剪贴板历史">
  <Grid x:Name="Root" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Padding="20">
-  <ScrollViewer x:Name="HistoryScroll" HorizontalContentAlignment="Stretch" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"><local:HistoryView Width="{Binding ElementName=HistoryScroll, Path=ViewportWidth}"/></ScrollViewer>
+  <ScrollViewer x:Name="HistoryScroll" HorizontalContentAlignment="Stretch" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"><local:HistoryView x:Name="HistoryContents" Width="{Binding ElementName=HistoryScroll, Path=ViewportWidth}"/></ScrollViewer>
  </Grid>
 </Window>

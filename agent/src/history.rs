@@ -24,6 +24,34 @@ pub struct HistoryData {
     pub entries: Vec<Entry>,
 }
 impl HistoryData {
+    pub fn needs_prune(&self, cfg: &HistorySettings, now: u64) -> bool {
+        let cutoff = now.saturating_sub(cfg.days.saturating_mul(86400));
+        let mut previous = u64::MAX;
+        let mut count = 0;
+        let mut bytes: usize = self
+            .entries
+            .iter()
+            .filter(|e| e.favorite)
+            .map(|e| e.text.len())
+            .sum();
+        for entry in &self.entries {
+            if entry.timestamp > previous {
+                return true;
+            }
+            previous = entry.timestamp;
+            if !entry.favorite {
+                if entry.timestamp < cutoff
+                    || count >= cfg.limit
+                    || bytes + entry.text.len() > MAX_TOTAL
+                {
+                    return true;
+                }
+                count += 1;
+                bytes += entry.text.len();
+            }
+        }
+        false
+    }
     pub fn validate(&self) -> io::Result<()> {
         if self.entries.len() > 1050
             || self.entries.iter().filter(|e| e.favorite).count() > 50

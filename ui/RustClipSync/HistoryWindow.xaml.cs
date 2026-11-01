@@ -4,9 +4,13 @@ using Microsoft.UI.Xaml;
 namespace RustClipSync;
 public sealed partial class HistoryWindow : Window
 {
+    private readonly WindowActivity activity;
     internal HistoryWindow(AppearanceSettings appearance)
     {
         InitializeComponent();
+        activity = new WindowActivity(this, active => HistoryContents.SetActive(active));
+        Root.Loaded += (_, _) => activity.Update(true);
+        Closed += (_, _) => { activity.Dispose(); HistoryContents.Close(); };
         var scale = Math.Max(1, GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(this)) / 96.0);
         var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
         var width = Math.Min((int)(620 * scale), area.Width); var height = Math.Min((int)(600 * scale), area.Height);
