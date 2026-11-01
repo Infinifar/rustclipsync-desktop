@@ -1,0 +1,10 @@
+{
+  "dotnet": {
+    "major": 10,
+    "downloadUrl": "https://dotnet.microsoft.com/zh-cn/download/dotnet/10.0"
+  },
+  "windowsAppRuntime": {
+    "version": "2.6.4",
+    "downloadUrl": "https://aka.ms/windowsappsdk/2.6/2.6.4/windowsappruntimeinstall-x64.exe"
+  }
+}

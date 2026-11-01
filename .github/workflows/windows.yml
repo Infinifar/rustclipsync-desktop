@@ -11,6 +11,14 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+      - name: Parse Windows build and verification scripts
+        shell: pwsh
+        run: |
+          Get-ChildItem scripts -Filter '*.ps1' | ForEach-Object {
+            $tokens = $null; $parseErrors = $null
+            [Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$parseErrors) | Out-Null
+            if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
+          }
       - name: Select Rust MSVC toolchain
         run: |
           rustup toolchain install 1.99.1 --profile minimal --component clippy,rustfmt
@@ -37,9 +45,12 @@ jobs:
         run: cargo test --locked --test windows_control -- --ignored --test-threads=1
       - name: Build native background agent
         run: cargo build --locked --release --bin rustclipsync-agent
-      - name: Build self-contained WinUI and per-user installer
+      - name: Build small framework-dependent WinUI and per-user installer
         shell: pwsh
         run: ./scripts/build-windows.ps1
+      - name: Test missing dependencies and install the official shared runtime
+        shell: pwsh
+        run: ./scripts/test-windows-dependencies.ps1
       - name: Test install, double-click, icon and uninstall
         shell: pwsh
         run: ./scripts/test-windows-install.ps1

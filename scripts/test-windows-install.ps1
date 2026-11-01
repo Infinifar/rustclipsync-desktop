@@ -5,9 +5,17 @@ $root = Split-Path $PSScriptRoot -Parent
 $setup = Get-Item "$root/dist/installer/RustClipSync-*-setup-x64.exe"
 $destination = Join-Path $env:RUNNER_TEMP 'RustClipSync-installed'
 $log = Join-Path $env:RUNNER_TEMP 'RustClipSync-install.log'
+# Seed application-owned runtime leftovers to exercise replacement during upgrade.
+New-Item -ItemType Directory -Force "$destination/zh-CN" | Out-Null
+Set-Content "$destination/coreclr.dll" 'old runtime fixture'
+Set-Content "$destination/zh-CN/Microsoft.ui.xaml.dll.mui" 'old language fixture'
 $process = Start-Process $setup.FullName -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/TASKS=',"/DIR=`"$destination`"","/LOG=`"$log`"") -Wait -PassThru
 if ($process.ExitCode -ne 0) { Get-Content $log -Tail 80; throw "Install failed: $($process.ExitCode)" }
 if (!(Test-Path "$destination/RustClipSync.exe") -or !(Test-Path "$destination/rustclipsync-agent.exe")) { throw 'Installed executables are missing' }
+if ((Test-Path "$destination/coreclr.dll") -or (Test-Path "$destination/zh-CN/Microsoft.ui.xaml.dll.mui")) { throw 'Old app-local runtime files were left behind' }
+$help = Get-Content "$destination/RuntimeHelp.html" -Raw
+$runtimes = Get-Content "$root/packaging/windows-runtimes.json" -Raw | ConvertFrom-Json
+if (!$help.Contains($runtimes.dotnet.downloadUrl) -or !$help.Contains($runtimes.windowsAppRuntime.downloadUrl) -or $help.Contains('@@')) { throw 'Installed dependency help is incomplete' }
 # Check icons embedded in the actual delivered files, not only loose assets.
 Add-Type -AssemblyName System.Drawing
 $reference = [Drawing.Icon]::new("$root/assets/rustclipsync.ico",32,32)
@@ -81,6 +89,7 @@ public static class ScreenSize { [DllImport("user32.dll")] public static extern 
 } finally {
     $env:LOCALAPPDATA = $originalData
 }
+. "$PSScriptRoot/test-windows-installer-help.ps1"
 $remove = Start-Process "$destination/unins000.exe" -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru
 if ($remove.ExitCode -ne 0 -or (Test-Path "$destination/RustClipSync.exe")) { throw 'Uninstall verification failed' }
 Write-Output 'PASS: per-user install, embedded icons, double-click first-run WinUI and uninstall.'

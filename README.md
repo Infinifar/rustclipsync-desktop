@@ -17,7 +17,7 @@
 
 安装后打开“设置”，填写 HTTPS 服务端地址、账户和密码即可配对。Linux 安装命令、桌面要求和快捷键配置见 [Linux 使用说明](LINUX.md)。Wayland 需要 data-control 支持；缺少该协议的 GNOME/Wayland 会话暂不支持。
 
-Windows 安装包目前未签名，签名进度见 [签名政策](CODE-SIGNING.md)。
+Windows 使用系统共享运行库，缺少依赖时提供微软官方下载入口，见 [Windows 安装说明](WINDOWS.md)。安装包目前未签名，签名进度见 [签名政策](CODE-SIGNING.md)。
 
 ## 功能
 

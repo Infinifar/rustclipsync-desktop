@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RustClipSync 运行环境</title>
+<style>
+  :root { color-scheme: light dark; font: 16px/1.7 "Segoe UI", system-ui, sans-serif; }
+  body { max-width: 640px; margin: 64px auto; padding: 0 24px; }
+  h1 { font-size: 26px; }
+  .download { display: inline-block; margin: 8px 12px 8px 0; padding: 10px 16px; border: 1px solid; border-radius: 6px; }
+</style>
+<h1>RustClipSync 运行环境</h1>
+<p>精简安装包使用系统共享运行库。如果打开应用时提示缺少依赖，请从微软官方网站安装以下 <strong>x64</strong> 版本，再重新打开 RustClipSync。</p>
+<p>
+  <a class="download" href="@@DOTNET_RUNTIME_URL@@" rel="noreferrer">下载 .NET 10 Runtime（x64）</a>
+  <a class="download" href="@@WINDOWS_RUNTIME_URL@@" rel="noreferrer">下载 Windows App Runtime @@WINDOWS_RUNTIME_VERSION@@（x64）</a>
+</p>
+<ul>
+  <li>已经安装兼容版本时，无需重复下载。</li>
+  <li>.NET 10 Desktop Runtime 或 SDK 也包含所需的 .NET Runtime。仅有 .NET Framework、.NET 8/9 或 x86 版本不能替代。</li>
+  <li>运行库安装器可能需要管理员权限。离线安装前请提前下载所需安装器。</li>
+  <li>应用不会在后台下载或执行安装器。按钮只打开微软官方下载链接。</li>
+</ul>
+<p>首次补齐依赖的下载量不包含在客户端安装包大小内。安装运行库不需要重新配对，也不需要删除剪贴板数据。</p>
+<p lang="en">Missing dependencies? Install the x64 .NET 10 Runtime and Windows App Runtime @@WINDOWS_RUNTIME_VERSION@@ from Microsoft using the links above, then reopen RustClipSync.</p>
+</html>
