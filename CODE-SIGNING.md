@@ -10,7 +10,7 @@ RustClipSync Desktop 和共享 rustclipsync-core 使用 MIT 许可证。拟由 [
 
 申请范围为本项目从公开源码构建的 RustClipSync.exe、rustclipsync-agent.exe、自有托管程序集，以及安装程序；Inno Setup 卸载器和临时安装副本的处理需与 SignPath 确认可行流程。不得使用本项目的 SignPath Foundation 权限重新签署第三方 DLL。
 
-仅提交能追溯到公开提交、构建工作流和版本的产物。第三方组件保留原签名和许可证。当前自包含微软运行组件是否符合 System Libraries 例外，需要如实申报并由 SignPath 确认；详见 [第三方组件](THIRD-PARTY.md)。
+仅提交能追溯到公开提交、构建工作流和版本的产物。第三方组件保留原签名和许可证。当前随包微软组件是否符合 System Libraries 例外，需要如实申报并由 SignPath 确认；详见 [第三方组件](THIRD-PARTY.md)。
 
 ## 隐私
 

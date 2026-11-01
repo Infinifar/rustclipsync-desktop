@@ -37,6 +37,10 @@ Windows 和 Linux 工作流仅作为可复用子工作流，不再分别响应�
 构建仅需读取源码，发布任务单独取得 `contents: write`，清理任务单独取得
 `actions: write`。
 
+Windows 精简包使用共享运行库；`packaging/windows-runtimes.json` 中的版本和官方
+下载链接必须与 UI 依赖同步更新。CI 验证缺失依赖的提示、微软签名的运行库安装和
+完整安装流程，并生成 `size-report.json`。新依赖应核对 20 MiB 安装器体积预算。
+
 正式发布与代码签名分别管理。当前 Windows 安装包未签名，发布说明明确标注；
 SignPath 获批并接入后，须先签名和验证，再生成最终校验和。见
 [签名政策](CODE-SIGNING.md)。

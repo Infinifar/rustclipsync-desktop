@@ -3,7 +3,7 @@
 以下是锁定依赖的声明清单，不是法律兼容性结论。自有源码为 MIT，不会替换依赖原许可证。
 
 - Rust：下表由 cargo metadata --locked --offline 生成，包含跨平台和构建依赖，具体随包内容应以发布清单为准。ring 等源码包中的额外版权通知也需保留。
-- .NET、Windows App SDK、WinUI 和 Visual C++ 运行组件：安装包自包含携带，按微软相应条款分发；不能因部分上游源码为 MIT 就断言整个分发包均为 MIT。申请 SignPath 时应确认 System Libraries 例外及具体分发许可，保留供应商已有签名，不用项目证书重签。
+- Windows：.NET 和 Windows App Runtime 使用系统共享运行库；随包仍含 WinUI/.NET API 绑定、启动组件和少量 Visual C++ 运行组件，按微软相应条款分发。不能因部分上游源码为 MIT 就断言整个分发包均为 MIT。申请 SignPath 时应确认 System Libraries 例外及具体分发许可，保留供应商已有签名，不用项目证书重签。
 - Inno Setup：构建工具及安装引擎，遵循其原许可；安装器、卸载器和临时副本的签名应使用经验证的集成流程。
 - Linux：Qt 6 和 libdbus 由发行版包提供并动态链接，不在本项目安装包中复制其运行库；对应许可证与源码由发行版包维护。新增 Rust Wayland、X11、Secret Service 依赖列于下表。
 - 图标：复用本项目维护者的 Omaclipsync 图标。

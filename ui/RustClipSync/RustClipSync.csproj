@@ -29,6 +29,7 @@
   <ItemGroup>
     <Manifest Include="$(ApplicationManifest)" />
     <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="2.6.4" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Runtime" Version="2.6.4" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.9457" />
     <Content Include="..\..\assets\rustclipsync.png" Link="Assets\rustclipsync.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\assets\rustclipsync.ico" Link="Assets\rustclipsync.ico" CopyToOutputDirectory="PreserveNewest" />
