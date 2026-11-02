@@ -39,9 +39,15 @@ $end = (Get-Date).AddSeconds(30)
 do { Start-Sleep -Milliseconds 250; $ui.Refresh() } while ($ui.MainWindowHandle -eq 0 -and !$ui.HasExited -and (Get-Date) -lt $end)
 if ($ui.HasExited -or $ui.MainWindowHandle -eq 0) { throw 'Reopened paired WinUI did not start' }
 $script:window = [System.Windows.Automation.AutomationElement]::FromHandle($ui.MainWindowHandle)
+# This fixture deliberately has no reachable server. Protocol 3 keeps the local
+# pause but cannot confirm its direction until the server acknowledges it.
 $end = (Get-Date).AddSeconds(20)
-do { $status = Get-Control SyncState; if ($status.Current.Name -eq '已暂停自动同步') { break }; Start-Sleep -Milliseconds 200 } while ((Get-Date) -lt $end)
-if ($status.Current.Name -ne '已暂停自动同步') { throw "WinUI did not read actual backend state: $($status.Current.Name)" }
+do { $status = Get-Control SyncState; if ($status.Current.Name -eq '方向尚未获服务端确认') { break }; Start-Sleep -Milliseconds 200 } while ((Get-Date) -lt $end)
+if ($status.Current.Name -ne '方向尚未获服务端确认') { throw "WinUI did not show the unconfirmed offline direction: $($status.Current.Name)" }
+$request = @{id=[Guid]::NewGuid().ToString();ipcVersion=1;method='getStatus';params=@{}} | ConvertTo-Json -Compress
+$snapshot = $request | & "$destination/rustclipsync-agent.exe" rpc | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0 -or $null -eq $snapshot.result -or $snapshot.result.state -ne 'direction_unconfirmed' -or $snapshot.result.paused -ne $true -or $snapshot.result.config.paused -ne $true -or $snapshot.result.deviceId -ne $device -or $snapshot.result.cursor -ne 42 -or $snapshot.result.inbox.id -ne $privateId) { throw 'Offline direction reporting did not preserve the paused device and encrypted local state' }
+if ((Get-Control PauseSync).Current.Name -ne '恢复') { throw 'Offline paused UI did not offer resume' }
 $all = $script:window.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.Condition]::TrueCondition)
 foreach ($element in $all) { if ($element.Current.Name -like '*UI private fixture*') { throw 'Private inbox plaintext leaked into UI automation' } }
 Start-Sleep -Seconds 2 # let the compositor finish the reopened window's first frames
