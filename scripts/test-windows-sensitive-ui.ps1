@@ -83,9 +83,9 @@ $inspectors = @(Get-InspectorWindows)
 if ($inspectors.Count -ne 1 -or [InspectorWindowTest]::GetAncestor([IntPtr]$inspectors[0].Current.NativeWindowHandle,2) -ne $inspectorHandle -or ![InspectorWindowTest]::IsIconic($mainHandle)) { throw 'Repeated detach did not reuse inspector/minimize main' }
 $script:window = $inspector
 Invoke-Control DeleteSensitiveText
-$end = (Get-Date).AddSeconds(15)
-do { if (!(Get-Control RevealSensitiveText).Current.IsEnabled) { break }; Start-Sleep -Milliseconds 100 } while ((Get-Date) -lt $end)
-Assert-ControlName RevealSensitiveText '••••••••'
+Assert-ControlName SensitiveReceivedTime '暂无敏感收件项'
+Assert-ControlName SensitiveWindowText '••••••••'
+if ((Get-Control RevealSensitiveText).Current.IsEnabled) { throw 'Deleted inbox remains readable in inspector' }
 $request = @{id=[Guid]::NewGuid().ToString();ipcVersion=1;method='getStatus';params=@{}} | ConvertTo-Json -Compress
 $snapshot = $request | & "$destination/rustclipsync-agent.exe" rpc | ConvertFrom-Json
 if ($null -ne $snapshot.result.inbox -or $snapshot.result.cursor -ne 42) { throw 'Inspector delete did not clear only the inbox' }
