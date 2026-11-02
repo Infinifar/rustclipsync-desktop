@@ -191,8 +191,8 @@ ApplicationWindow {
                     Label { visible: online; text: qsTr("最近同步：%1%2").arg(backend.receivedTime(backend.status.lastSync || 0)).arg(backend.status.pending ? qsTr(" · 有待发送内容") : ""); wrapMode: Text.Wrap; Layout.fillWidth: true; Layout.leftMargin: 24; Layout.rightMargin: 24 }
                     RowLayout {
                         Layout.fillWidth: true; Layout.leftMargin: 24; Layout.rightMargin: 24
-                        Button { text: qsTr("发送"); Layout.fillWidth: true; enabled: online && !backend.busy; onClicked: backend.invoke("pushNow") }
-                        Button { text: qsTr("接收"); Layout.fillWidth: true; enabled: online && !backend.busy; onClicked: backend.invoke("pullNow") }
+                        Button { text: qsTr("发送"); Layout.fillWidth: true; enabled: online && !backend.busy && !config.paused && config.direction !== "download"; onClicked: backend.invoke("pushNow") }
+                        Button { text: qsTr("接收"); Layout.fillWidth: true; enabled: online && !backend.busy && !config.paused && config.direction !== "upload"; onClicked: backend.invoke("pullNow") }
                         Button { text: config.paused ? qsTr("恢复") : qsTr("暂停"); Layout.fillWidth: true; enabled: online && !backend.busy; onClicked: backend.invoke("setPaused", {paused: !config.paused}) }
                     }
                     Label { text: qsTr("同步方向"); Layout.leftMargin: 24 }

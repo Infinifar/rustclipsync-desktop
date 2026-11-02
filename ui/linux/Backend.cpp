@@ -194,7 +194,10 @@ void Backend::beginPair(const QString &server, const QString &account, const QSt
     });
     connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), process, [this, process](int code, QProcess::ExitStatus status) {
         m_busy = false;
-        if (code != 0 || status != QProcess::NormalExit) { fail(QString::fromUtf8(process->readAllStandardError().left(2048)).trimmed()); }
+        if (code != 0 || status != QProcess::NormalExit) {
+            const auto message = QString::fromUtf8(process->readAllStandardError().left(2048)).trimmed();
+            fail(message.contains("protocol_unsupported") ? stateLabel("protocol_unsupported") : message.contains("revocation_unconfirmed") ? stateLabel("revocation_unconfirmed") : message);
+        }
         else { m_status.clear(); emit changed(); emit paired(); startAgent(); }
         process->deleteLater();
     });
@@ -248,7 +251,7 @@ void Backend::setAutostart(bool enabled) {
 }
 QString Backend::receivedTime(qint64 seconds) const { return seconds > 0 ? QLocale().toString(QDateTime::fromSecsSinceEpoch(seconds), QLocale::ShortFormat) : QStringLiteral("尚未同步"); }
 QString Backend::stateLabel(const QString &state) const {
-    static const QHash<QString, QString> labels = {{"connected", "已连接"}, {"connecting", "正在连接"}, {"paused", "已暂停自动同步"}, {"offline", "网络连接失败，将自动重试"}, {"credentials", "凭据不正确，请重新配对"}, {"conflict", "存在同步冲突，请明确发送或接收"}, {"expired", "待发送内容已过期，请重新复制"}, {"re_pair", "服务端状态已改变，需要重新配对"}, {"storage_error", "加密存储不可用，请检查密钥环与文件权限"}, {"clipboard_error", "剪贴板访问失败，请检查桌面支持"}, {"settings_changed", "设置已改变，请刷新后重试"}, {"history_error", "历史记录不可用"}, {"invalid_request", "操作已失效，请刷新后重试"}, {"needs_restart", "后台需要重新启动"}};
+    static const QHash<QString, QString> labels = {{"direction_superseded", "方向会话已更新或撤销，请明确重新选择方向或重新配对"}, {"revocation_unconfirmed", "旧方向会话撤销尚未确认，原配对已保留，请联网后重试"}, {"protocol_unsupported", "协议版本不匹配，请升级服务端和客户端"}, {"direction_unconfirmed", "本地方向已保存，服务端尚未确认；接收保持关闭"}, {"direction_blocked", "当前方向或暂停状态不允许此操作"}, {"operation_unconfirmed", "操作结果尚未确认，请刷新状态"}, {"connected", "已连接"}, {"connecting", "正在连接"}, {"paused", "已暂停自动同步"}, {"offline", "网络连接失败，将自动重试"}, {"credentials", "凭据不正确，请重新配对"}, {"conflict", "存在同步冲突，请明确发送或接收"}, {"expired", "待发送内容已过期，请重新复制"}, {"re_pair", "服务端状态已改变，需要重新配对"}, {"storage_error", "加密存储不可用，请检查密钥环与文件权限"}, {"clipboard_error", "剪贴板访问失败，请检查桌面支持"}, {"settings_changed", "设置已改变，请刷新后重试"}, {"history_error", "历史记录不可用"}, {"invalid_request", "操作已失效，请刷新后重试"}, {"needs_restart", "后台需要重新启动"}};
     return labels.value(state, state.isEmpty() ? QStringLiteral("后台未连接") : state);
 }
 

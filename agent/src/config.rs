@@ -177,6 +177,14 @@ impl Config {
     pub fn identity(&self) -> String {
         rustclipsync_core::hash(&format!("{}\0{}", self.server, self.user))
     }
+    pub fn server_direction(&self) -> rustclipsync_core::direction::SyncDirection {
+        use rustclipsync_core::direction::SyncDirection;
+        match self.direction {
+            Direction::Upload => SyncDirection::PushOnly,
+            Direction::Download => SyncDirection::ReceiveOnly,
+            Direction::Both => SyncDirection::Bidirectional,
+        }
+    }
     pub fn uploads(&self) -> bool {
         self.direction != Direction::Download
     }

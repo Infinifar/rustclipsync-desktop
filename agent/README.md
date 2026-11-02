@@ -1,6 +1,6 @@
 # Windows Rust 后台
 
-Current synchronization uses the `/api/...` endpoints from rustclipsync-core 0.3.0. Update the server and clients together.
+Current synchronization uses the `/api/...` endpoints from rustclipsync-core 0.4.0. Update the server and clients together.
 
 `rustclipsync-agent` 是普通用户会话进程，复用 `rustclipsync-core` 0.2.0。同步、剪贴板、状态/历史加密、游标与本地控制由 Rust 负责；WinUI 窗口关闭后，后台独立运行。
 
@@ -114,3 +114,5 @@ CI 另外执行实际安装、WinUI 三页、主题/字号持久化、真实自�
 ## Linux desktop host
 
 The same agent now selects platform adapters at compile time. Shared orchestration is in `src/runtime.rs`, encrypted history in `src/local_history.rs`, and Linux desktop integration in `src/linux/`. `rustclipsync-core` remains unchanged. See [Linux usage and build instructions](../LINUX.md).
+
+方向状态使用协议 3，由共享 core 先报告并等待 ACK，WS 失败时 HTTP 降级；暂停保留选定方向，手动收发也服从方向。本地 `direction_unconfirmed` 和 `revocation_unconfirmed` 明确表示远端未确认，`protocol_unsupported` 要求升级配套版本。普通后台退出不撤销；显式重配对/换账户先撤销旧会话。补发窗口仅由服务端管理。

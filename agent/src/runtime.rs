@@ -114,7 +114,7 @@ impl Control {
             Command::ExportDiagnostics {} => {
                 let s = self.snapshot.lock().map_err(|_| "unavailable")?;
                 return Ok(
-                    json!({"version":env!("CARGO_PKG_VERSION"),"coreVersion":"0.2.0","state":*self.status.lock().map_err(|_|"unavailable")?,"paused":self.paused.load(Ordering::SeqCst),"pending":s.pending,"historyError":s.history_error}),
+                    json!({"version":env!("CARGO_PKG_VERSION"),"coreVersion":"0.4.0","state":*self.status.lock().map_err(|_|"unavailable")?,"paused":self.paused.load(Ordering::SeqCst),"pending":s.pending,"historyError":s.history_error}),
                 );
             }
             Command::Quit {} => return Ok(json!({})),
@@ -185,6 +185,9 @@ impl Clipboard for PairingClipboard {
     }
 }
 pub fn pair(dir: &Path, config: &Config, password: String, reset: bool) -> Result<(), SyncError> {
+    if reset {
+        revoke_previous_pairing(dir)?;
+    }
     let identity = config.identity();
     let mut session = Session::open(
         SessionConfig {
@@ -205,10 +208,62 @@ pub fn pair(dir: &Path, config: &Config, password: String, reset: bool) -> Resul
         Arc::new(AtomicU64::new(0)),
     )?;
     if reset {
-        session.re_pair()
+        session.re_pair_with_direction(config.server_direction(), config.paused)
     } else {
+        session.set_sync_direction(config.server_direction(), config.paused)?;
         session.check()
     }
+}
+/// Explicit migration escape hatch: forget only this local pairing, never claim remote revocation.
+/// The CLI requires a verbose confirmation flag and an exclusive agent-instance lock.
+pub fn forget_local_pairing(dir: &Path) -> io::Result<()> {
+    let config_path = dir.join("config.json");
+    let Some(bytes) = storage::read_private(&config_path, 64 * 1024)? else {
+        return Ok(());
+    };
+    let mut config: Config = serde_json::from_slice(&bytes).map_err(io::Error::other)?;
+    config.validate()?;
+    let state = dir.join(format!("{}.state", config.identity()));
+    match std::fs::remove_file(state) {
+        Ok(()) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error),
+    }
+    std::fs::remove_file(config_path)
+}
+// Explicit account replacement must finish revocation before discarding the old identity.
+fn revoke_previous_pairing(dir: &Path) -> Result<(), SyncError> {
+    let Some(bytes) = storage::read_private(&dir.join("config.json"), 64 * 1024)? else {
+        return Ok(());
+    };
+    let mut previous: Config = serde_json::from_slice(&bytes).map_err(io::Error::other)?;
+    previous.validate()?;
+    let identity = previous.identity();
+    let mut session = Session::open(
+        SessionConfig {
+            server: previous.server.clone(),
+            encryption_key: storage::load_key(dir, &identity)?,
+            filter: Filter::new(FilterMode::Off, &[], false).expect("empty filter"),
+            allow_sensitive: false,
+        },
+        Arc::new(Client::new(
+            &previous.server,
+            previous.user.clone(),
+            String::new(),
+            false,
+        )?),
+        FileStateStore(dir.join(format!("{identity}.state"))),
+        PairingClipboard,
+        NoHistory,
+        Arc::new(AtomicU64::new(0)),
+    )?;
+    session.revoke_sync_direction().map_err(|error| {
+        if matches!(classify(&error), "protocol_unsupported" | "storage_error") {
+            error
+        } else {
+            SyncError::Remote(Error::Status(424))
+        }
+    })
 }
 fn open_live(
     dir: &Path,
@@ -285,22 +340,37 @@ fn run_inner(
     if !config.uploads() || config.paused {
         session.record_clear()?;
     }
+    if let Err(error) = session.set_sync_direction(config.server_direction(), config.paused) {
+        control.set_status(classify(&error));
+    }
     control.refresh(config, &session, None);
     let mut worker = None;
     let mut seen = 0;
     let mut next = Instant::now();
     let mut retry = 1;
-    let mut blocked = false;
+    let mut blocked = control
+        .status
+        .lock()
+        .is_ok_and(|state| matches!(*state, "protocol_unsupported" | "direction_superseded"));
     let mut cleanup = Instant::now();
     while !control.stop.load(Ordering::SeqCst) {
         let paused = control.paused.load(Ordering::SeqCst);
         if config.paused != paused {
+            drop(worker.take());
+            control.generation.fetch_add(1, Ordering::SeqCst);
             session.record_clear()?;
             seen = control.generation.load(Ordering::SeqCst);
             config.paused = paused;
             save_config(dir, config)?;
             if let Ok(mut s) = control.snapshot.lock() {
                 s.revision += 1;
+            }
+            if let Err(error) = session.set_sync_direction(config.server_direction(), paused) {
+                control.set_status(direction_report_status(&error));
+                blocked = matches!(
+                    classify(&error),
+                    "protocol_unsupported" | "direction_superseded" | "credentials"
+                );
             }
             next = Instant::now();
         }
@@ -317,9 +387,29 @@ fn run_inner(
                 let _ = job.reply.send(Err("operation_unconfirmed"));
                 continue;
             }
+            let direction_change = match &job.command {
+                Command::SetPaused { .. } => true,
+                Command::UpdateSettings {
+                    config: updated, ..
+                } => updated.direction != config.direction,
+                _ => false,
+            };
+            if direction_change {
+                drop(worker.take());
+                // Policy changes invalidate in-flight work, not synthesize a clipboard copy.
+                seen = control.generation.fetch_add(1, Ordering::SeqCst) + 1;
+            }
             let result = command(job.command, dir, config, &mut session, control);
             match &result {
                 Ok(_) => {
+                    if direction_change {
+                        blocked = false;
+                        control.set_status(if config.paused {
+                            "paused"
+                        } else {
+                            "connecting"
+                        });
+                    }
                     if matches!(
                         *control
                             .status
@@ -333,7 +423,15 @@ fn run_inner(
                 }
                 Err(error) => {
                     let state = classify(error);
-                    if matches!(state, "conflict" | "expired" | "re_pair" | "credentials") {
+                    if matches!(
+                        state,
+                        "conflict"
+                            | "expired"
+                            | "re_pair"
+                            | "credentials"
+                            | "protocol_unsupported"
+                            | "direction_superseded"
+                    ) {
                         blocked = true;
                         control.set_status(state);
                     }
@@ -341,7 +439,23 @@ fn run_inner(
             }
             control.refresh(config, &session, None);
             let fatal = matches!(result, Err(SyncError::Storage(_)));
-            let _ = job.reply.send(result.map_err(|e| classify(&e)));
+            let _ = job.reply.send(result.map_err(|e| {
+                if direction_change
+                    && !matches!(
+                        classify(&e),
+                        "protocol_unsupported"
+                            | "direction_superseded"
+                            | "storage_error"
+                            | "invalid_request"
+                            | "settings_changed"
+                            | "shortcut_conflict"
+                    )
+                {
+                    "direction_unconfirmed"
+                } else {
+                    classify(&e)
+                }
+            }));
             if fatal {
                 return Err(SyncError::Storage(io::Error::other(
                     "control storage failure",
@@ -405,7 +519,22 @@ fn run_inner(
             cleanup = Instant::now() + Duration::from_secs(60);
         }
         if paused && !blocked {
-            control.set_status("paused");
+            if Instant::now() >= next {
+                let result = session
+                    .set_sync_direction(config.server_direction(), true)
+                    .and_then(|_| session.flush(seen).map(|_| ()));
+                match result {
+                    Ok(()) => control.set_status("paused"),
+                    Err(error) => {
+                        control.set_status(direction_report_status(&error));
+                        blocked = matches!(
+                            classify(&error),
+                            "protocol_unsupported" | "direction_superseded" | "credentials"
+                        );
+                    }
+                }
+                next = Instant::now() + Duration::from_secs(config.interval_sec);
+            }
         } else if !paused && !blocked && Instant::now() >= next {
             let observed = seen;
             let operation = (|| {
@@ -452,7 +581,15 @@ fn run_inner(
                     if state == "storage_error" {
                         return Err(error);
                     }
-                    if matches!(state, "conflict" | "expired" | "re_pair" | "credentials") {
+                    if matches!(
+                        state,
+                        "conflict"
+                            | "expired"
+                            | "re_pair"
+                            | "credentials"
+                            | "protocol_unsupported"
+                            | "direction_superseded"
+                    ) {
                         blocked = true;
                     }
                     if matches!(error, SyncError::Clipboard(_)) {
@@ -509,6 +646,7 @@ fn command(
             if !paused {
                 control.set_status("connecting");
             }
+            s.set_sync_direction(config.server_direction(), paused)?;
             Ok(json!({}))
         }
         Command::UpdateSettings {
@@ -524,6 +662,7 @@ fn command(
                 return Err(SyncError::Remote(Error::Status(412)));
             }
             updated.paused = config.paused;
+            let direction_changed = updated.direction != config.direction;
             if updated.direction != config.direction
                 || updated.allow_sensitive != config.allow_sensitive
                 || updated.auto_apply_sensitive != config.auto_apply_sensitive
@@ -549,9 +688,16 @@ fn command(
             if let Ok(mut v) = control.snapshot.lock() {
                 v.revision += 1;
             }
+            if direction_changed {
+                s.set_sync_direction(config.server_direction(), config.paused)?;
+            }
             Ok(json!({}))
         }
         Command::PushNow {} | Command::PullNow {} => {
+            if !manual_allowed(config, matches!(cmd, Command::PushNow {})) {
+                return Err(SyncError::Remote(Error::Status(405)));
+            }
+            s.check()?;
             let outcome = if matches!(cmd, Command::PushNow {}) {
                 s.push_now(observed)?
             } else {
@@ -632,8 +778,38 @@ fn command(
         _ => Err(invalid()),
     }
 }
+fn manual_allowed(config: &Config, upload: bool) -> bool {
+    !config.paused
+        && if upload {
+            config.uploads()
+        } else {
+            config.downloads()
+        }
+}
+fn direction_report_status(error: &SyncError) -> &'static str {
+    match classify(error) {
+        "offline" | "conflict" => "direction_unconfirmed",
+        state => state,
+    }
+}
 pub fn classify(error: &SyncError) -> &'static str {
     match error {
+        SyncError::Remote(Error::DirectionRequired) => "direction_unconfirmed",
+        SyncError::Remote(Error::Protocol(error)) => {
+            use rustclipsync_core::direction::DirectionErrorCode;
+            match error.code {
+                DirectionErrorCode::ProtocolUnsupported => "protocol_unsupported",
+                DirectionErrorCode::Unauthenticated | DirectionErrorCode::DeviceMismatch => {
+                    "credentials"
+                }
+                DirectionErrorCode::VersionStale | DirectionErrorCode::SessionRevoked => {
+                    "direction_superseded"
+                }
+                DirectionErrorCode::DirectionForbidden => "direction_blocked",
+                DirectionErrorCode::InvalidDirection => "invalid_request",
+                DirectionErrorCode::RateLimited | DirectionErrorCode::SessionOffline => "offline",
+            }
+        }
         SyncError::Storage(_) => "storage_error",
         SyncError::Credentials | SyncError::Remote(Error::Status(401 | 403)) => "credentials",
         SyncError::Conflict | SyncError::Remote(Error::Status(409)) => "conflict",
@@ -641,6 +817,9 @@ pub fn classify(error: &SyncError) -> &'static str {
         SyncError::Epoch => "re_pair",
         SyncError::Clipboard(_) => "clipboard_error",
         SyncError::Remote(Error::InvalidProfile) => "invalid_request",
+        SyncError::Remote(Error::Status(424)) => "revocation_unconfirmed",
+        SyncError::Remote(Error::Status(426)) => "protocol_unsupported",
+        SyncError::Remote(Error::Status(405)) => "direction_blocked",
         SyncError::Remote(Error::Status(412)) => "settings_changed",
         SyncError::Remote(Error::Status(422)) => "history_error",
         SyncError::Remote(Error::Status(423)) => "shortcut_conflict",
@@ -652,4 +831,86 @@ fn unix_time() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs()
+}
+
+#[cfg(test)]
+mod direction_tests {
+    use super::*;
+
+    #[test]
+    fn explicit_local_forget_preserves_history_and_other_profile_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut config = Config::new("https://example.invalid/".into(), "fixture".into());
+        config.validate().unwrap();
+        storage::atomic_write(
+            &dir.path().join("config.json"),
+            &serde_json::to_vec(&config).unwrap(),
+        )
+        .unwrap();
+        let state = dir.path().join(format!("{}.state", config.identity()));
+        std::fs::write(&state, b"fixture-state").unwrap();
+        let history = dir.path().join(format!("{}.history", config.identity()));
+        std::fs::write(&history, b"fixture-encrypted-history").unwrap();
+        let other = dir.path().join("other.state");
+        std::fs::write(&other, b"other-profile").unwrap();
+        forget_local_pairing(dir.path()).unwrap();
+        assert!(!dir.path().join("config.json").exists());
+        assert!(!state.exists());
+        assert_eq!(
+            std::fs::read(history).unwrap(),
+            b"fixture-encrypted-history"
+        );
+        assert_eq!(std::fs::read(other).unwrap(), b"other-profile");
+        forget_local_pairing(dir.path()).unwrap();
+    }
+    #[test]
+    fn manual_transfer_respects_the_selected_direction_and_pause() {
+        use crate::config::Direction;
+        let mut config = Config::new("https://example.invalid/".into(), "fixture".into());
+        for (direction, upload, download) in [
+            (Direction::Upload, true, false),
+            (Direction::Download, false, true),
+            (Direction::Both, true, true),
+        ] {
+            config.direction = direction;
+            config.paused = false;
+            assert_eq!(manual_allowed(&config, true), upload);
+            assert_eq!(manual_allowed(&config, false), download);
+            config.paused = true;
+            assert!(!manual_allowed(&config, true));
+            assert!(!manual_allowed(&config, false));
+        }
+    }
+    #[test]
+    fn protocol_and_unconfirmed_revocation_have_actionable_distinct_states() {
+        assert_eq!(
+            classify(&SyncError::Remote(Error::Status(426))),
+            "protocol_unsupported"
+        );
+        assert_eq!(
+            classify(&SyncError::Remote(Error::Status(424))),
+            "revocation_unconfirmed"
+        );
+        assert_eq!(
+            classify(&SyncError::Remote(Error::Status(405))),
+            "direction_blocked"
+        );
+        assert_eq!(
+            classify(&SyncError::Remote(Error::Status(401))),
+            "credentials"
+        );
+        use rustclipsync_core::direction::{DirectionErrorCode, SyncDirectionError};
+        for code in [
+            DirectionErrorCode::VersionStale,
+            DirectionErrorCode::SessionRevoked,
+        ] {
+            let error = SyncError::Remote(Error::Protocol(SyncDirectionError {
+                code,
+                version: Some(7),
+                minimum_protocol_version: None,
+            }));
+            assert_eq!(classify(&error), "direction_superseded");
+            assert_eq!(direction_report_status(&error), "direction_superseded");
+        }
+    }
 }

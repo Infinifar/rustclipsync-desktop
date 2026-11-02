@@ -69,7 +69,7 @@ fn entry() -> io::Result<()> {
         return Ok(());
     }
     if args.first().is_some_and(|arg| arg == "--help") {
-        println!("rustclipsync-agent run\nrustclipsync-agent rpc < request.json\nrustclipsync-agent pair <https-url> <account> [--reset] [--password-stdin]\nPassword is read from the console or the GUI's anonymous stdin pipe, never command-line arguments.");
+        println!("rustclipsync-agent run\nrustclipsync-agent rpc < request.json\nrustclipsync-agent pair <https-url> <account> [--reset] [--password-stdin]\nforget-pairing --confirm-remote-revocation-unconfirmed (local only; remote access may remain)\nPassword is read from the console or the GUI's anonymous stdin pipe, never command-line arguments.");
         return Ok(());
     }
     if args[0] == "rpc" && args.len() == 1 {
@@ -90,6 +90,13 @@ fn entry() -> io::Result<()> {
     storage::ensure_private_dir(&dir)?;
     let _lock = InstanceLock::acquire(&dir)?;
     match args[0].as_str() {
+        "forget-pairing"
+            if args.len() == 2 && args[1] == "--confirm-remote-revocation-unconfirmed" =>
+        {
+            runtime::forget_local_pairing(&dir)?;
+            println!("Local pairing and pending/inbox state removed. Remote revocation remains UNCONFIRMED; revoke the old device on its server. History and key-store entries were retained.");
+            Ok(())
+        }
         "pair"
             if args.len() >= 3
                 && args.len() <= 5

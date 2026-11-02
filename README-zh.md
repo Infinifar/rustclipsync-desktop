@@ -1,6 +1,6 @@
 <p><img src="assets/omaclipsync.svg" alt="RustClipSync 图标" width="64" height="64"></p>
 
-当前同步统一使用共享核心 rustclipsync-core 0.3.0 的 `/api/...` 接口；服务端与各客户端需要配套更新。
+当前同步统一使用共享核心 rustclipsync-core 0.4.0 的 `/api/...` 接口；服务端与各客户端需要配套更新。
 
 # RustClipSync Desktop
 
@@ -31,6 +31,14 @@ Windows 使用系统共享运行库，缺少依赖时提供微软官方下载入
 - **界面资源管理**：Windows 页面首次打开时创建，主窗最小化时暂停轮询、恢复立即刷新；历史按存储实例、修订号和查询条件缓存，无变化时复用列表。
 - **桌面集成**：主题、字号、登录自启；Windows 提供托盘和全局快捷键，Linux 可通过桌面快捷键打开历史或敏感小窗。
 
+## 方向上报与协议兼容
+
+本客户端要求协议 **3**（`X-RCS-Protocol: 3`），必须与对应服务端配套升级；旧客户端继续使用旧服务端。版本不匹配时停止同步并提示升级，不会反复提示凭据错误。
+
+连接和重连后，核心先上报单向推送、单向接收或双向方向，收到 ACK 后才接收。开关变更立即上报，WS 控制通道失败时使用认证 HTTP 降级。本地方向和敏感过滤始终保留；上报失败显示“尚未确认”，不会放开接收。暂停保留方向和配对，同时禁止收发；手动收发同样遵守方向和暂停设置。
+
+关闭界面或正常退出后台只表示离线，不等于退出登录。显式重新配对或更换账户前必须确认撤销旧方向会话；失败时提示未确认并保留原身份。方向状态闲置 30 天后由服务端失效。重连补发在最新方向确认后进行，每设备最多补发一条满足接收条件的消息；时间窗口及关闭选项由服务端管理页面决定，客户端不硬编码。详见[方向协议](https://github.com/Infinifar/rustclipsync-server/blob/main/docs/DIRECTION-PROTOCOL.md)。
+
 ## 隐私
 
 “同步已标记的敏感文本”默认关闭。部分应用可能不标记敏感内容，因此不能识别所有敏感信息。
@@ -46,3 +54,15 @@ Windows 使用系统共享运行库，缺少依赖时提供微软官方下载入
 相关项目：[服务端](https://github.com/Infinifar/rustclipsync-server) · [接口协议](https://github.com/Infinifar/rustclipsync-server/blob/main/PROTOCOL.md) · [Android 输入法](https://github.com/Infinifar/fcitx5-android-bibi-keyboard) · [Omaclipsync](https://github.com/Infinifar/omaclipsync)
 
 MIT 许可证；第三方组件见 [THIRD-PARTY.md](THIRD-PARTY.md)。
+
+### 从旧服务端迁移
+
+服务端和客户端必须成套切换。旧实例没有方向撤销接口时，先用其管理员或旧版客户端撤销旧设备令牌，停止后台，然后明确执行：
+
+```bash
+rustclipsync-agent forget-pairing --confirm-remote-revocation-unconfirmed
+```
+
+这会删除本机设备令牌、待发送项和敏感收件区，保留加密历史和密钥环项；它不代表远端已撤销，旧服务端可能仍授权旧令牌，必须由旧管理员撤销。之后再配对新服务端。协议不支持从不视为撤销成功。
+
+HTTP 降级使用 30 秒在线租约，与管理页活动标记独立。服务端补发窗口为 0 时仅关闭离线存储和补发，符合方向的在线设备仍正常实时收发。

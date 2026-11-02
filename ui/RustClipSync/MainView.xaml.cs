@@ -122,6 +122,11 @@ public sealed partial class MainView : UserControl
     {
         var code = error is AgentError known ? known.Code : "unavailable";
         Show("操作未完成", code switch {
+            "direction_superseded" => "方向会话已被更新或撤销，自动同步已停止。请明确重新选择方向或重新配对。",
+            "protocol_unsupported" => "协议版本不匹配，请升级服务端和客户端。",
+            "revocation_unconfirmed" => "旧方向会话的撤销尚未确认，原配对已保留。请联网后重试。",
+            "direction_unconfirmed" => "本地方向已保存，服务端尚未确认。接收保持关闭，请检查网络后重试。",
+            "direction_blocked" => "当前方向或暂停状态不允许此操作。",
             "credentials" => "设备凭据无效，请在设置中输入密码重新配对。",
             "re_pair" => "服务端状态或设备身份已变更，请重新配对。",
             "conflict" => "另一端已经有更新。请明确选择发送本机内容或接收远端内容。",
@@ -142,7 +147,8 @@ public sealed partial class MainView : UserControl
     {
         busy = value;
         if (SettingsCreated) { ConnectButton.IsEnabled = !value; SaveSettingsButton.IsEnabled = !value && running; }
-        PushButton.IsEnabled = PullButton.IsEnabled = !value && running;
+        PushButton.IsEnabled = !value && running && config is not null && !config.Paused && config.Direction != "download";
+        PullButton.IsEnabled = !value && running && config is not null && !config.Paused && config.Direction != "upload";
         PauseButton.IsEnabled = !value; StopButton.IsEnabled = !value && running;
         DirectionBox.IsEnabled = !value && running;
         HistoryPanel.IsEnabled = !value && running;
@@ -259,7 +265,7 @@ public sealed partial class MainView : UserControl
             config = snapshot.GetProperty("config").Deserialize<AgentSettings>(AgentClient.Json)!;
             revision = snapshot.GetProperty("configRevision").GetUInt64();
             if (formRevision == 0) formRevision = revision;
-            StateText.Text = state switch { "connected" => "已连接 · 实时同步", "connecting" => "正在连接", "paused" => "已暂停自动同步", "offline" => "网络未连接", "credentials" => "设备凭据无效", "conflict" => "同步存在冲突", "expired" => "待发送内容已过期", "re_pair" => "需要重新配对", "storage_error" => "本地加密状态不可用", "clipboard_error" => "剪贴板暂时不可用", "stopping" => "后台正在退出", _ => "正在启动" };
+            StateText.Text = state switch { "direction_superseded" => "方向会话已更新或撤销，请明确重新选择方向", "revocation_unconfirmed" => "旧会话撤销尚未确认", "direction_blocked" => "当前方向不允许此操作", "protocol_unsupported" => "协议版本不匹配，请升级客户端和服务端", "direction_unconfirmed" => "方向尚未获服务端确认", "connected" => "已连接 · 实时同步", "connecting" => "正在连接", "paused" => "已暂停自动同步", "offline" => "网络未连接", "credentials" => "设备凭据无效", "conflict" => "同步存在冲突", "expired" => "待发送内容已过期", "re_pair" => "需要重新配对", "storage_error" => "本地加密状态不可用", "clipboard_error" => "剪贴板暂时不可用", "stopping" => "后台正在退出", _ => "正在启动" };
             ServerText.Text = $"服务端：{config.Server}";
             var device = snapshot.GetProperty("deviceId").GetString(); DeviceText.Text = $"设备：{(string.IsNullOrEmpty(device) ? "正在读取" : device)}";
             var timestamp = snapshot.GetProperty("lastSync").GetInt64();
@@ -337,7 +343,12 @@ public sealed partial class MainView : UserControl
             var output = process.StandardOutput.ReadToEndAsync(); var error = process.StandardError.ReadToEndAsync();
             await process.StandardInput.WriteLineAsync(PasswordBox.Password); process.StandardInput.Close(); PasswordBox.Password = "";
             await process.WaitForExitAsync(); await output; var code = (await error).Trim();
-            if (process.ExitCode != 0) { Show("连接未完成", code.Contains("credentials", StringComparison.Ordinal) ? "账户或密码不正确。" : "请检查服务端地址、网络、证书、设备状态和本地权限。", InfoBarSeverity.Error); return; }
+            if (process.ExitCode != 0) {
+                var message = code.Contains("protocol_unsupported", StringComparison.Ordinal) ? "协议版本不匹配，请同时升级服务端与客户端。" :
+                    code.Contains("revocation_unconfirmed", StringComparison.Ordinal) ? "旧会话撤销未确认，原配对已保留。请先由旧服务端管理员撤销令牌；迁移方法见 README。" :
+                    code.Contains("credentials", StringComparison.Ordinal) ? "账户或密码不正确。" : "请检查服务端地址、网络、证书、设备状态和本地权限。";
+                Show("连接未完成", message, InfoBarSeverity.Error); return;
+            }
             ReadConfig(); formLoaded = false; AgentClient.Start(); await Task.Delay(500); await Refresh(); Navigation.SelectedItem = HomeNav;
             Show("配对完成", "设备身份已保存，日常同步无需再次输入账户密码。", InfoBarSeverity.Success);
         }
