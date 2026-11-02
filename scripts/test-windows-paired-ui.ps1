@@ -78,7 +78,11 @@ $autoSensitive.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Patt
 Invoke-Control SaveSyncSettings
 $end = (Get-Date).AddSeconds(15)
 do { $stored = Get-Content "$data/config.json" -Raw | ConvertFrom-Json; if ($stored.allowSensitive -and $stored.autoApplySensitive) { break }; Start-Sleep -Milliseconds 100 } while ((Get-Date) -lt $end)
-if (!$stored.allowSensitive -or !$stored.autoApplySensitive) { throw 'WinUI sensitive auto-write setting did not reach Rust config' }
+if (!$stored.allowSensitive -or !$stored.autoApplySensitive) {
+    Save-Screen 'failed-sensitive-settings-save'
+    $errors = @(Get-RuntimeEvents | Where-Object kind -eq 'ui-error' | Select-Object -Last 3 | ForEach-Object detail)
+    throw "WinUI sensitive auto-write setting did not reach Rust config; recent UI errors: $($errors -join ', ')"
+}
 Save-Screen 'sensitive-auto-write-settings'
 # Preserve the previous inbox without applying it merely because the option changed.
 $request = @{id=[Guid]::NewGuid().ToString();ipcVersion=1;method='getStatus';params=@{}} | ConvertTo-Json -Compress

@@ -13,7 +13,8 @@ public sealed partial class MainView : UserControl
     private AgentSettings? config;
     private ulong revision, formRevision;
     private bool initialized, updating, busy, closed, running, paused, formLoaded;
-    private bool refreshing, refreshAgain;
+    private Task refreshTask = Task.CompletedTask;
+    private bool refreshAgain;
     public bool AppearanceCreated { get; private set; }
     public bool SettingsCreated { get; private set; }
     public bool ShortcutsCreated { get; private set; }
@@ -121,6 +122,7 @@ public sealed partial class MainView : UserControl
     private void Error(Exception error)
     {
         var code = error is AgentError known ? known.Code : "unavailable";
+        RuntimeDiagnostics.Record("ui-error", "main", code);
         Show("操作未完成", code switch {
             "direction_superseded" => "方向会话已被更新或撤销，自动同步已停止。请明确重新选择方向或重新配对。",
             "protocol_unsupported" => "协议版本不匹配，请升级服务端和客户端。",
@@ -146,6 +148,7 @@ public sealed partial class MainView : UserControl
     private void SetBusy(bool value)
     {
         busy = value;
+        Navigation.IsEnabled = !value;
         if (SettingsCreated) { ConnectButton.IsEnabled = !value; SaveSettingsButton.IsEnabled = !value && running; }
         PushButton.IsEnabled = !value && running && config is not null && !config.Paused && config.Direction != "download";
         PullButton.IsEnabled = !value && running && config is not null && !config.Paused && config.Direction != "upload";
@@ -234,17 +237,20 @@ public sealed partial class MainView : UserControl
         }
         finally { updating = false; }
     }
-    private async Task Refresh()
+    private Task Refresh()
     {
-        if (!CanRefresh) return;
-        if (refreshing) { refreshAgain = true; return; }
-        refreshing = true;
-        try { await RefreshCore(); }
-        finally
+        if (!CanRefresh) return Task.CompletedTask;
+        if (!refreshTask.IsCompleted) { refreshAgain = true; return refreshTask; }
+        refreshTask = RefreshLoop();
+        return refreshTask;
+    }
+    private async Task RefreshLoop()
+    {
+        do
         {
-            refreshing = false;
-            if (refreshAgain) { refreshAgain = false; if (CanRefresh) _ = Refresh(); }
-        }
+            refreshAgain = false;
+            await RefreshCore();
+        } while (refreshAgain && CanRefresh);
     }
     private async Task RefreshCore()
     {
@@ -288,7 +294,13 @@ public sealed partial class MainView : UserControl
         var success = false;
         try { var result = await agent.Call(method, parameters); success = true; if (!closed) { Show("操作完成", result.TryGetProperty("outcome", out var outcome) ? outcome.GetString() switch { "filtered" => "内容已被敏感策略或过滤规则阻止。", "current" or "skipped" => "没有需要应用的新内容；不会重放已接收的剪贴板。", "stored" => "已存入敏感收件区，未写入系统剪贴板。", _ => "同步操作已完成。" } : "设置或本地操作已完成。", InfoBarSeverity.Success); } }
         catch (Exception error) { Error(error); }
-        finally { SetBusy(false); await Refresh(); }
+        finally
+        {
+            // Commands can persist a new configuration even when reporting its
+            // direction fails. Refresh the revision before enabling navigation.
+            try { await Refresh(); }
+            finally { SetBusy(false); }
+        }
         return success;
     }
     private async void Pause_Click(object sender, RoutedEventArgs e)
