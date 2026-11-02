@@ -14,13 +14,14 @@ public static class InspectorWindowTest {
 '@
 Invoke-Control NavHome
 Invoke-Control RevealHomeSensitiveText
-if ((Get-Control HomeSensitiveText).Current.Name -ne 'UI private fixture') { throw 'Home explicit reveal did not read the inbox body' }
+Assert-ControlName HomeSensitiveText 'UI private fixture'
 Invoke-Control RevealHomeSensitiveText
-if ((Get-Control HomeSensitiveText).Current.Name -ne '••••••••') { throw 'Home hide left visible plaintext' }
+Assert-ControlName HomeSensitiveText '••••••••'
 Invoke-Control RevealHomeSensitiveText
+Assert-ControlName HomeSensitiveText 'UI private fixture'
 Invoke-Control NavAppearance
 Invoke-Control NavHome
-if ((Get-Control HomeSensitiveText).Current.Name -ne '••••••••') { throw 'Navigating away did not conceal home plaintext' }
+Assert-ControlName HomeSensitiveText '••••••••'
 # Text actions must remain in the requested order on one horizontal row.
 $previous = $null
 foreach ($id in @('CopyHomeSensitiveText','RevealHomeSensitiveText','DeleteHomeSensitiveText','OpenSensitiveSettings')) {
@@ -54,16 +55,16 @@ $script:window = $inspector
 $end = (Get-Date).AddSeconds(15)
 do { if ((Get-Control RevealSensitiveText).Current.IsEnabled) { break }; Start-Sleep -Milliseconds 100 } while ((Get-Date) -lt $end)
 if (!(Get-Control RevealSensitiveText).Current.IsEnabled) { throw 'Inspector could not read inbox metadata' }
-if ((Get-Control SensitiveWindowText).Current.Name -ne '••••••••') { throw 'Inspector did not start masked' }
+Assert-ControlName SensitiveWindowText '••••••••'
 if ((Get-Control SensitiveReceivedTime).Current.Name -notlike '收到时间：*') { throw 'Inspector receipt time missing' }
 (Get-Control PinSensitiveWindow).GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle()
 Start-Sleep -Milliseconds 200
 if (([InspectorWindowTest]::GetWindowLongPtr($inspectorHandle,-20).ToInt64() -band 8) -eq 0) { throw 'Pin did not set actual WS_EX_TOPMOST' }
 Save-Screen 'sensitive-small-window'
 Invoke-Control RevealSensitiveText
-if ((Get-Control SensitiveWindowText).Current.Name -ne 'UI private fixture') { throw 'Explicit reveal did not read the actual inbox body' }
+Assert-ControlName SensitiveWindowText 'UI private fixture'
 Invoke-Control RevealSensitiveText
-if ((Get-Control SensitiveWindowText).Current.Name -ne '••••••••') { throw 'Hide did not remove the plaintext from UI' }
+Assert-ControlName SensitiveWindowText '••••••••'
 Invoke-Control CopySensitiveText
 $confirm = $script:window.FindFirst([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,'复制'))
 if (!$confirm) { throw 'Sensitive copy confirmation missing' }
@@ -84,7 +85,7 @@ $script:window = $inspector
 Invoke-Control DeleteSensitiveText
 $end = (Get-Date).AddSeconds(15)
 do { if (!(Get-Control RevealSensitiveText).Current.IsEnabled) { break }; Start-Sleep -Milliseconds 100 } while ((Get-Date) -lt $end)
-if ((Get-Control RevealSensitiveText).Current.IsEnabled -or (Get-Control SensitiveWindowText).Current.Name -ne '••••••••') { throw 'Deleted inbox remains readable in inspector' }
+Assert-ControlName RevealSensitiveText '••••••••'
 $request = @{id=[Guid]::NewGuid().ToString();ipcVersion=1;method='getStatus';params=@{}} | ConvertTo-Json -Compress
 $snapshot = $request | & "$destination/rustclipsync-agent.exe" rpc | ConvertFrom-Json
 if ($null -ne $snapshot.result.inbox -or $snapshot.result.cursor -ne 42) { throw 'Inspector delete did not clear only the inbox' }

@@ -38,6 +38,15 @@ function Invoke-Control([string]$id) {
     }
     Start-Sleep -Milliseconds 400
 }
+function Assert-ControlName([string]$id,[string]$expected) {
+    $end = (Get-Date).AddSeconds(20)
+    do {
+        if ((Get-Control $id).Current.Name -eq $expected) { return }
+        Start-Sleep -Milliseconds 100
+    } while ((Get-Date) -lt $end)
+    Save-Screen 'failed-control-text'
+    throw "UI control did not reach the expected text: $id"
+}
 function Select-Combo([string]$id,[string]$label) {
     $combo = Get-Control $id
     $combo.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern).Expand()
