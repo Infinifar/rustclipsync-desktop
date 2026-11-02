@@ -386,8 +386,10 @@ public sealed partial class MainView : UserControl
         Navigation.SelectedItem = SettingsNav; PrivacySettingsSection.IsExpanded = true;
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => {
             if (closed || !ReferenceEquals(Navigation.SelectedItem, SettingsNav)) return;
-            PrivacySettingsSection.UpdateLayout();
-            PrivacySettingsSection.StartBringIntoView(new BringIntoViewOptions { AnimationDesired = false, VerticalAlignmentRatio = 0 });
+            PageScroll.UpdateLayout();
+            // Bring the actual toggle into view, not the expander's header.
+            // Expansion and the page's scroll extent update in separate passes.
+            AutoSensitiveToggle.StartBringIntoView(new BringIntoViewOptions { AnimationDesired = false, VerticalAlignmentRatio = 0.5 });
         });
     }
     private void OpenInboxWindow_Click(object sender, RoutedEventArgs e)
