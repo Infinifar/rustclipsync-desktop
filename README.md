@@ -1,6 +1,6 @@
 <p><img src="assets/omaclipsync.svg" alt="RustClipSync icon" width="64" height="64"></p>
 
-Current synchronization uses the `/api/...` endpoints from rustclipsync-core 0.4.0. Update the server and clients together.
+Version **0.5.0** uses rustclipsync-core **0.4.0** and wire protocol **3** at `/api/...`. Pair it with RustClipSync Server **3.0.0**; see the [release notes](releases/v0.5.0.md). Older clients need server 2.0.0.
 
 # RustClipSync Desktop
 
@@ -38,6 +38,8 @@ This client requires protocol **3** (`X-RCS-Protocol: 3`); update it together wi
 At connection/reconnection, the shared core reports upload-only, receive-only or bidirectional mode and waits for a server ACK before receiving. Direction changes are reported immediately, using the WebSocket control channel with an authenticated HTTP fallback. Local direction and sensitive-content filters remain active when a report fails; the UI marks the direction as unconfirmed. Pausing keeps the chosen direction and pairing while blocking sending and receiving. Manual send/receive obey the same direction and pause state.
 
 Ordinary UI or background-process closure is offline, not logout. Explicit re-pairing or account replacement must confirm revocation of the previous direction session before replacing the local identity; a failed revocation is shown as unconfirmed. Server-side inactive direction state expires after 30 days. Reconnect backfill is only the latest eligible per-device message, after the latest direction ACK. Its retention window belongs to the server administration page, including the disable setting; the client does not choose or hardcode a backfill window. See the [direction protocol](https://github.com/Infinifar/rustclipsync-server/blob/main/docs/DIRECTION-PROTOCOL.md).
+
+Mobile apps and Fcitx input methods are released separately and are not part of this release batch. Verify their protocol-3 support before switching a shared server. Omaclipsync **0.4.0** is the matching Omarchy plugin release.
 
 ## Privacy
 
