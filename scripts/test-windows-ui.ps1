@@ -13,11 +13,29 @@ function Get-Control([string]$id) {
     throw "UI control missing: $id"
 }
 function Invoke-Control([string]$id) {
-    $element = Get-Control $id
+    # Configuration can be persisted before a direction request finishes. Wait
+    # for the UI operation to complete, rather than clicking its disabled button.
+    $end = (Get-Date).AddSeconds(70)
+    do {
+        $element = Get-Control $id
+        if ($element.Current.IsEnabled) { break }
+        Start-Sleep -Milliseconds 100
+    } while ((Get-Date) -lt $end)
+    if (!$element.Current.IsEnabled) {
+        Save-Screen 'failed-control-disabled'
+        throw "UI control remained disabled: $id"
+    }
+    Write-Output "Invoke UI control: $id [$($element.Current.Name)]"
     $pattern = $null
-    if ($element.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern,[ref]$pattern)) { $pattern.Select() }
-    elseif ($element.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern,[ref]$pattern)) { $pattern.Invoke() }
-    else { throw "UI control cannot be selected: $id" }
+    try {
+        if ($element.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern,[ref]$pattern)) { $pattern.Select() }
+        elseif ($element.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern,[ref]$pattern)) { $pattern.Invoke() }
+        else { throw "UI control cannot be selected: $id" }
+    } catch {
+        Save-Screen 'failed-control-invoke'
+        # Do not repeat an invocation whose side effects may already have run.
+        throw "UI invocation failed for ${id}: $($_.Exception.Message)"
+    }
     Start-Sleep -Milliseconds 400
 }
 function Select-Combo([string]$id,[string]$label) {
