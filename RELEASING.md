@@ -5,8 +5,9 @@ Windows 和 Linux 工作流仅作为可复用子工作流，不再分别响应�
 
 ## 发布新版本
 
-1. 更新客户端版本：Rust agent、Cargo.lock、WinUI 工程/关于、Win32 资源、
+1. 更新客户端版本：Rust agent、Cargo.lock、WinUI 工程/关于页独立版本字段、Win32 资源、
    Inno Setup、Qt 工程/应用版本和 Arch PKGBUILD。共享核心使用独立 API 版本。
+   程序显示名称固定为 `RustClipSync`，版本只更新独立的 `AboutVersion` 文本，不能拼入名称。
 2. 新建 `releases/v版本号.md`，使用英文填写本次发布说明。
 3. 本地执行 `python3 scripts/release.py check` 和
    `python3 -m unittest discover -s scripts -p 'test_release.py' -v`。

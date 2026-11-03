@@ -34,7 +34,7 @@ def check_versions(root=ROOT):
     values = {
         "Cargo.lock": next(p["version"] for p in locked if p["name"] == "rustclipsync-agent"),
         "WinUI assembly": ET.parse(root / "ui/RustClipSync/RustClipSync.csproj").findtext("PropertyGroup/Version"),
-        "WinUI about": match_version(root, "ui/RustClipSync/MainView.xaml", r'Text="RustClipSync ([0-9.]+)"'),
+        "WinUI about": match_version(root, "ui/RustClipSync/MainView.xaml", r'x:Name="AboutVersion" Text="版本 ([0-9.]+)"'),
         "installer": match_version(root, "packaging/RustClipSync.iss", r'#define AppVersion "([0-9.]+)"'),
         "Qt project": match_version(root, "ui/linux/CMakeLists.txt", r'project\(RustClipSyncLinux VERSION ([0-9.]+)'),
         "Qt application": match_version(root, "ui/linux/main.cpp", r'setApplicationVersion\("([0-9.]+)"\)'),
