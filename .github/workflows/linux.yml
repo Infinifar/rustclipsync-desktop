@@ -86,8 +86,9 @@ jobs:
           XDG_RUNTIME_DIR=/tmp/rcs-ui-runtime QT_QPA_PLATFORM=offscreen QT_QPA_PLATFORMTHEME=generic QT_QUICK_BACKEND=software build/linux/rustclipsync --data-dir /tmp/rcs-ui-profile --smoke-test
           # Never exercise the runner's original D-Bus or clipboard.
           native_test=$(cargo test --locked --test linux_native --no-run --message-format=json | python3 -c 'import json,sys; print(next(m["executable"] for line in sys.stdin if (m:=json.loads(line)).get("reason")=="compiler-artifact" and m.get("target",{}).get("name")=="linux_native" and m.get("executable")))')
+          runtime_test=$(cargo test --locked --lib -p rustclipsync-agent --no-run --message-format=json | python3 -c 'import json,sys; print(next(m["executable"] for line in sys.stdin if (m:=json.loads(line)).get("reason")=="compiler-artifact" and m.get("target",{}).get("name")=="rustclipsync_agent" and m.get("executable")))')
           useradd --create-home --uid 1001 rcs-test
-          runuser -u rcs-test -- env RCS_LINUX_TEST_BINARY="$native_test" python3 scripts/test-linux-native.py
+          runuser -u rcs-test -- env RCS_LINUX_TEST_BINARY="$native_test" RCS_LINUX_RUNTIME_TEST_BINARY="$runtime_test" python3 scripts/test-linux-native.py
           desktop-file-validate packaging/linux/io.github.infinifar.rustclipsync.desktop
       - name: Create native distribution package
         run: python3 scripts/package-linux.py '${{ matrix.format }}' --distro '${{ matrix.distro }}'

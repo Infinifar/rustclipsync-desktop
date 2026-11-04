@@ -269,7 +269,7 @@ fn open_live(
     dir: &Path,
     config: &Config,
     clipboard: PlatformClipboard,
-    generation: Arc<AtomicU64>,
+    control: &Control,
 ) -> Result<LiveSession, SyncError> {
     let identity = config.identity();
     let key = storage::load_key(dir, &identity)?;
@@ -294,9 +294,23 @@ fn open_live(
         FileStateStore(dir.join(format!("{identity}.state"))),
         clipboard,
         history,
-        generation,
+        control.generation.clone(),
     )?;
     receive_policy(&mut session, config);
+    if !session.persisted.paired {
+        return Err(SyncError::Credentials);
+    }
+    if !config.uploads() || config.paused {
+        session.record_clear()?;
+    }
+    // Every newly constructed session needs its local policy even if its report
+    // cannot reach the server yet. Core retries the report before data access.
+    if let Err(error) = session.set_sync_direction(config.server_direction(), config.paused) {
+        if matches!(error, SyncError::Storage(_)) {
+            return Err(error);
+        }
+        control.set_status(direction_report_status(&error));
+    }
     Ok(session)
 }
 fn receive_policy(session: &mut LiveSession, config: &Config) {
@@ -333,25 +347,18 @@ fn run_inner(
     control: &Control,
     events: Receiver<(u64, Event)>,
 ) -> Result<(), SyncError> {
-    let mut session = open_live(dir, config, clipboard, control.generation.clone())?;
-    if !session.persisted.paired {
-        return Err(SyncError::Credentials);
-    }
-    if !config.uploads() || config.paused {
-        session.record_clear()?;
-    }
-    if let Err(error) = session.set_sync_direction(config.server_direction(), config.paused) {
-        control.set_status(classify(&error));
-    }
+    let mut session = open_live(dir, config, clipboard, control)?;
     control.refresh(config, &session, None);
     let mut worker = None;
     let mut seen = 0;
     let mut next = Instant::now();
     let mut retry = 1;
-    let mut blocked = control
-        .status
-        .lock()
-        .is_ok_and(|state| matches!(*state, "protocol_unsupported" | "direction_superseded"));
+    let mut blocked = control.status.lock().is_ok_and(|state| {
+        matches!(
+            *state,
+            "protocol_unsupported" | "direction_superseded" | "credentials"
+        )
+    });
     let mut cleanup = Instant::now();
     while !control.stop.load(Ordering::SeqCst) {
         let paused = control.paused.load(Ordering::SeqCst);
@@ -593,9 +600,9 @@ fn run_inner(
                         blocked = true;
                     }
                     if matches!(error, SyncError::Clipboard(_)) {
+                        // Core has already journaled uncertain writes. Retain its
+                        // direction, pending work and echo state while retrying.
                         drop(worker.take());
-                        session =
-                            open_live(dir, config, session.clipboard, control.generation.clone())?;
                     }
                     next = Instant::now() + Duration::from_secs(retry);
                     retry = (retry * 2).min(30);
@@ -911,6 +918,92 @@ mod direction_tests {
             }));
             assert_eq!(classify(&error), "direction_superseded");
             assert_eq!(direction_report_status(&error), "direction_superseded");
+        }
+    }
+}
+
+#[cfg(all(test, any(windows, target_os = "linux", feature = "check-windows")))]
+mod recovery_tests {
+    use super::*;
+    use rustclipsync_core::state::{self, InboxItem, Persisted, State};
+
+    #[test]
+    #[ignore = "Uses native key storage; run only in a disposable native-test session"]
+    fn every_live_session_restores_direction_when_reporting_is_offline() {
+        #[cfg(any(windows, feature = "check-windows"))]
+        assert_eq!(std::env::var("RCS_WINDOWS_DISPOSABLE").as_deref(), Ok("1"));
+        #[cfg(all(target_os = "linux", not(feature = "check-windows")))]
+        assert_eq!(std::env::var("RCS_LINUX_DISPOSABLE").as_deref(), Ok("1"));
+        for direction in [
+            crate::config::Direction::Both,
+            crate::config::Direction::Upload,
+            crate::config::Direction::Download,
+        ] {
+            for paused in [false, true] {
+                // Reserve then close a loopback port: no deployed server or credentials.
+                let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+                let address = listener.local_addr().unwrap();
+                drop(listener);
+                let mut config = Config::new(format!("https://{address}/"), "fixture".into());
+                config.direction = direction;
+                config.paused = paused;
+                config.allow_sensitive = true;
+                config.validate().unwrap();
+                let temp = tempfile::tempdir().unwrap();
+                let dir = temp.path().join("profile");
+                storage::ensure_private_dir(&dir).unwrap();
+                let identity = config.identity();
+                let key = storage::load_key(&dir, &identity).unwrap();
+                let saved = Persisted {
+                    server: config.server.clone(),
+                    token: state::random_token().unwrap(),
+                    paired: true,
+                    state: State::new(
+                        state::random_uuid().unwrap(),
+                        state::random_uuid().unwrap(),
+                        42,
+                    ),
+                    inbox: Some(InboxItem {
+                        id: state::random_uuid().unwrap(),
+                        text: "disposable private fixture".into(),
+                        received_at: 4_000_000_000,
+                    }),
+                };
+                storage::atomic_write(
+                    &dir.join(format!("{identity}.state")),
+                    &state::seal(&key, &saved).unwrap(),
+                )
+                .unwrap();
+                let (tx, _rx) = mpsc::sync_channel(32);
+                let control = Arc::new(Control::new(&config, tx));
+                #[cfg(all(target_os = "linux", not(feature = "check-windows")))]
+                let (clipboard, _monitor) = PlatformClipboard::start(control.clone()).unwrap();
+                #[cfg(any(windows, feature = "check-windows"))]
+                let clipboard =
+                    PlatformClipboard::new(0, platform::clipboard::Formats::register().unwrap());
+                let mut session = open_live(&dir, &config, clipboard, &control).unwrap();
+                for construction in 0..2 {
+                    let error = session.check().unwrap_err();
+                    assert!(
+                        !matches!(error, SyncError::Remote(Error::DirectionRequired)),
+                        "missing local direction: {direction:?}, paused={paused}, construction={construction}"
+                    );
+                    assert_eq!(
+                        serde_json::to_value(&session.persisted).unwrap(),
+                        serde_json::to_value(&saved).unwrap()
+                    );
+                    if !config.uploads() || paused {
+                        assert_eq!(session.push_now(0).unwrap(), Outcome::Paused);
+                    }
+                    if !config.downloads() || paused {
+                        assert_eq!(session.pull(0, Instant::now()).unwrap(), Outcome::Paused);
+                    }
+                    assert_eq!(*control.status.lock().unwrap(), "direction_unconfirmed");
+                    if construction == 0 {
+                        session = open_live(&dir, &config, session.clipboard, &control).unwrap();
+                    }
+                }
+            }
         }
     }
 }

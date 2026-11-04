@@ -1,3 +1,21 @@
+# 剪贴板错误后的方向恢复（开发分支，2026-11-04）
+
+分支：`fix/clipboard-error-session-recovery`。Windows 与 Linux 桌面端共享此修复。
+
+此前临时剪贴板错误会触发 `open_live` 重建会话，但方向初始化只在主循环启动时执行。新会话的本地方向为空，后续重试会在发出请求前返回 `DirectionRequired`，界面持续显示 `direction_unconfirmed`，服务端数据租约随之失效。
+
+现在按 Omaclipsync 的处理方式保留原会话和 core 的恢复记录，停止通知 Worker 后按原有 1–30 秒退避重试；方向初始化统一放到 `open_live`，覆盖未来的重建调用。上报失败保留本地选择并由 core 重试，服务端确认前仍禁止数据访问。存储错误停自动同步；凭据、会话撤销和协议错误保留既有阻断规则。服务端、共享 core、协议与持久化格式均未修改。
+
+本机验证：
+
+- `cargo test --locked --offline`：29 项通过、6 项需专用环境的测试忽略。
+- `python3 scripts/test-linux-native.py`：隔离 D-Bus、密钥环与显示服务中的 4 项原生测试、1 项新增方向恢复测试及两个 UI 进程激活检查通过。
+- 新增恢复测试覆盖三种方向 × 暂停/未暂停；分别检查首次创建和再次创建、服务端不可达时本地方向仍有效、禁用方向仍被阻止，以及配对身份、游标和加密收件区内容保留。原代码运行此测试会报 `missing local direction: Both, paused=false, construction=0`。
+- 普通 Clippy、`check-windows` 类型检查、rustfmt、rustdoc 和共享 core 快照哈希验证通过。
+- 与桌面端 vendor 的 `session.rs` 逐字节一致的独立 core 会话测试：48 项通过，包含临时剪贴板失败重试与不确定写入不重复应用。
+
+新增测试已接入 Windows 一次性 runner 和 Linux 隔离测试流程。本机检查不代替 Windows 原生构建与运行验收；此分支尚未发布或部署到 Legion16。
+
 # 共享核心修复快照同步（2026-11-01）
 
 当前工作区通过 `bash scripts/sync-core.sh` 更新 `agent/vendor/rustclipsync-core`，包含共享核心的 6 项同步边界修复。`UPSTREAM.json` 已重新生成，`sync-core.sh --check` 与 `python3 scripts/verify-core.py` 均通过，快照与共享源码逐文件一致。

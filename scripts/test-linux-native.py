@@ -20,10 +20,14 @@ def session():
         check=True,
         timeout=15,
     )
-    binary = os.environ.get("RCS_LINUX_TEST_BINARY")
-    command = ([binary] if binary else ["cargo", "test", "--locked", "--test", "linux_native", "--"])
-    command += ["--ignored", "--test-threads=1", "--nocapture"]
-    subprocess.run(command, cwd=ROOT, check=True)
+    for variable, target in (
+        ("RCS_LINUX_TEST_BINARY", ["--test", "linux_native"]),
+        ("RCS_LINUX_RUNTIME_TEST_BINARY", ["--lib", "-p", "rustclipsync-agent"]),
+    ):
+        binary = os.environ.get(variable)
+        command = ([binary] if binary else ["cargo", "test", "--locked", *target, "--"])
+        command += ["--ignored", "--test-threads=1", "--nocapture"]
+        subprocess.run(command, cwd=ROOT, check=True)
     ui = os.environ.get("RCS_LINUX_UI_BINARY")
     if ui:
         verify_activation(ui)
