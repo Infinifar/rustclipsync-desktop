@@ -38,7 +38,7 @@ jobs:
       - name: Test offline direction restoration with disposable Windows state
         env:
           RCS_WINDOWS_DISPOSABLE: "1"
-        run: cargo test --locked --lib -p rustclipsync-agent runtime::recovery_tests:: -- --ignored --test-threads=1
+        run: 'cargo test --locked --lib -p rustclipsync-agent runtime::recovery_tests:: -- --ignored --test-threads=1'
       - name: Measure allocations for synthetic 16 MiB history reads
         run: cargo test --locked --test history_cache -- --ignored --nocapture --test-threads=1
       - name: Test the clipboard on the disposable hosted Windows runner
